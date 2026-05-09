@@ -41,7 +41,7 @@ export default function HomePage() {
               <span className="text-xs font-medium text-white/70 tracking-wide">Desde 1911 &mdash; S. Joao das Lampas</span>
             </div>
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.05] mb-6 opacity-0 anim-fade-up d2">
-              Sociedade Recreativa, Desportiva e Familiar
+              Sociedade Recreativa Desportiva e Familiar de São João das Lampas
             </h1>
             <p className="text-base sm:text-lg text-white/60 max-w-lg mb-10 leading-relaxed opacity-0 anim-fade-up d3">
               Cultura, desporto, teatro e convivio. Mais de 114 anos ao servico da nossa comunidade.

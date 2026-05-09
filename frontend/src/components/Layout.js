@@ -38,10 +38,16 @@ function Header() {
         <div className="flex items-center justify-between h-[72px]">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3" data-testid="logo-link">
-            <img src={LOGO} alt="SRDFSIL" className="w-10 h-10 object-contain" />
-            <span className={`text-[15px] font-semibold tracking-tight hidden sm:block transition-colors ${textColor}`}>
-              SRDFSIL
-            </span>
+            <img
+              src={LOGO}
+              alt="SRDFSIL"
+              className={`object-contain transition-all duration-300 ${scrolled ? "w-9 h-9" : "w-14 h-14"}`}
+            />
+            {scrolled && (
+              <span className={`text-[13px] font-semibold tracking-tight hidden sm:block transition-colors leading-tight ${textColor}`}>
+                Sociedade Recreativa Desportiva<br/>e Familiar de S. João das Lampas
+              </span>
+            )}
           </Link>
 
           {/* Desktop nav */}
