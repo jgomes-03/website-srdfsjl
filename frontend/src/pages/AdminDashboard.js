@@ -48,7 +48,7 @@ export default function AdminDashboard() {
         <div className="p-5 border-b border-[var(--border)]">
           <div className="flex items-center gap-2">
             <LayoutDashboard size={18} className="text-[var(--green-700)]" />
-            <h2 className="text-sm font-bold text-[var(--text-primary)]">Admin SRDFSIL</h2>
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">Admin SRDFSJL</h2>
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-1">{user.email}</p>
         </div>

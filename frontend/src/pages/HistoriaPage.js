@@ -47,7 +47,7 @@ export default function HistoriaPage() {
             <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] mb-6">Mais de um Seculo de Tradicao</h2>
               <div className="space-y-4 text-base text-[var(--text-secondary)] leading-relaxed max-w-2xl mx-auto">
-                <p>A SRDFSIL foi fundada a 29 de Julho de 1911 por um grupo de cidadaos empenhados em criar um espaco de convivio, cultura e desporto para a comunidade.</p>
+                <p>A SRDFSJL foi fundada a 29 de Julho de 1911 por um grupo de cidadaos empenhados em criar um espaco de convivio, cultura e desporto para a comunidade.</p>
                 <p>Ao longo de mais de 110 anos, tem sido um pilar fundamental na vida social e cultural de S. Joao das Lampas.</p>
               </div>
             </div>

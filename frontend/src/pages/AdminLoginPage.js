@@ -25,12 +25,12 @@ export default function AdminLoginPage() {
     <div className="min-h-screen flex items-center justify-center px-5 bg-[var(--bg)]">
       <div className="w-full max-w-sm bg-white rounded-xl border border-[var(--border)] p-8 shadow-sm">
         <div className="text-center mb-8">
-          <img src={LOGO} alt="SRDFSIL" className="w-12 h-12 mx-auto mb-4 object-contain" />
+          <img src={LOGO} alt="SRDFSJL" className="w-12 h-12 mx-auto mb-4 object-contain" />
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Administracao</h1>
           <p className="text-sm text-[var(--text-muted)] mt-1">Acesso restrito</p>
         </div>
         <form onSubmit={submit} className="space-y-4" data-testid="admin-login-form">
-          <div><label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Email</label><input type="email" data-testid="admin-email-input" required value={email} onChange={e => setEmail(e.target.value)} className={inp} placeholder="admin@srdfsil.pt" /></div>
+          <div><label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Email</label><input type="email" data-testid="admin-email-input" required value={email} onChange={e => setEmail(e.target.value)} className={inp} placeholder="admin@srdfsjl.pt" /></div>
           <div><label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Password</label><input type="password" data-testid="admin-password-input" required value={password} onChange={e => setPassword(e.target.value)} className={inp} placeholder="********" /></div>
           {error && <p data-testid="admin-login-error" className="text-sm text-red-600">{error}</p>}
           <button type="submit" data-testid="admin-login-btn" disabled={loading}

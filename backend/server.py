@@ -295,7 +295,7 @@ async def get_contacts(request: Request):
 # --- Health ---
 @api_router.get("/")
 async def root():
-    return {"message": "SRDFSIL API is running"}
+    return {"message": "SRDFSJL API is running"}
 
 # Include router
 app.include_router(api_router)
@@ -318,7 +318,7 @@ async def startup():
     await db.members.create_index("email", unique=True)
 
     # Seed admin
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@srdfsil.pt")
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@srdfsjl.pt")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
@@ -348,7 +348,7 @@ async def startup():
                 "description": "Celebração tradicional da nossa freguesia com música ao vivo, arraial e fogo de artifício.",
                 "date": "2026-06-24",
                 "time": "19:00",
-                "location": "Sede da SRDFSIL",
+                "location": "Sede da SRDFSJL",
                 "price": "Entrada livre",
                 "image_url": "",
                 "created_at": datetime.now(timezone.utc).isoformat()
@@ -359,7 +359,7 @@ async def startup():
                 "description": "O grupo de teatro apresenta 'Que Grande Mixórdia' - uma revista à portuguesa... mas saloia!",
                 "date": "2026-07-15",
                 "time": "21:30",
-                "location": "Salão da SRDFSIL",
+                "location": "Salão da SRDFSJL",
                 "price": "12€",
                 "image_url": "",
                 "created_at": datetime.now(timezone.utc).isoformat()
@@ -370,7 +370,7 @@ async def startup():
                 "description": "Torneio aberto a todos os sócios e amigos. Inscrições até dia 10 de Agosto.",
                 "date": "2026-08-20",
                 "time": "10:00",
-                "location": "Campo da SRDFSIL",
+                "location": "Campo da SRDFSJL",
                 "price": "5€ por equipa",
                 "image_url": "",
                 "created_at": datetime.now(timezone.utc).isoformat()
@@ -395,7 +395,7 @@ async def startup():
                 "id": str(uuid.uuid4()),
                 "title": "Espetáculo de Teatro",
                 "image_url": "https://images.pexels.com/photos/19658083/pexels-photo-19658083.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-                "description": "Espetáculo do grupo de teatro da SRDFSIL",
+                "description": "Espetáculo do grupo de teatro da SRDFSJL",
                 "category": "Teatro",
                 "created_at": datetime.now(timezone.utc).isoformat()
             },
@@ -411,7 +411,7 @@ async def startup():
         await db.gallery.insert_many(sample_gallery)
         logger.info("Sample gallery seeded")
 
-    logger.info("SRDFSIL API started successfully")
+    logger.info("SRDFSJL API started successfully")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

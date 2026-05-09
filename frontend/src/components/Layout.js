@@ -40,7 +40,7 @@ function Header() {
           <Link to="/" className="flex items-center gap-3" data-testid="logo-link">
             <img
               src={LOGO}
-              alt="SRDFSIL"
+              alt="SRDFSJL"
               className={`object-contain transition-all duration-300 ${scrolled ? "w-9 h-9" : "w-14 h-14"}`}
             />
             {scrolled && (
@@ -57,7 +57,7 @@ function Header() {
                 key={n.to}
                 to={n.to}
                 data-testid={`nav-${n.to.replace("/", "") || "home"}`}
-                className={`px-3.5 py-2 text-[13px] font-medium rounded-lg transition-all duration-200 ${
+                className={`px-4 py-2 text-[15px] font-medium rounded-lg transition-all duration-200 ${
                   loc.pathname === n.to
                     ? (scrolled || !isHome ? "bg-[var(--green-100)] text-[var(--green-700)]" : "bg-white/15 text-white")
                     : `${textColor} hover:opacity-70`
@@ -69,7 +69,7 @@ function Header() {
             <Link
               to="/inscricao"
               data-testid="nav-inscricao-btn"
-              className="ml-3 px-5 py-2.5 text-[13px] font-semibold text-white rounded-lg btn-shine transition-all duration-200 hover:brightness-110"
+              className="ml-3 px-5 py-2.5 text-[15px] font-semibold text-white rounded-lg btn-shine transition-all duration-200 hover:brightness-110"
               style={{ backgroundColor: "var(--green-700)" }}
             >
               Fazer-me Socio
@@ -142,8 +142,8 @@ function Footer() {
           {/* Brand */}
           <div className="md:col-span-5">
             <div className="flex items-center gap-3 mb-4">
-              <img src={LOGO} alt="SRDFSIL" className="w-9 h-9 object-contain" />
-              <span className="text-sm font-semibold tracking-tight">SRDFSIL</span>
+              <img src={LOGO} alt="SRDFSJL" className="w-9 h-9 object-contain" />
+              <span className="text-sm font-semibold tracking-tight">SRDFSJL</span>
             </div>
             <p className="text-sm text-white/50 leading-relaxed max-w-xs">
               Sociedade Recreativa Desportiva e Familiar de S. Joao das Lampas. 
@@ -175,7 +175,7 @@ function Footer() {
         </div>
 
         <div className="mt-12 pt-6 border-t border-white/8 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-white/25">
-          <p>&copy; {new Date().getFullYear()} SRDFSIL. Todos os direitos reservados.</p>
+          <p>&copy; {new Date().getFullYear()} SRDFSJL. Todos os direitos reservados.</p>
           <Link to="/admin/login" className="hover:text-white/50 transition-colors">Admin</Link>
         </div>
       </div>

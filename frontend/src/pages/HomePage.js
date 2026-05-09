@@ -97,7 +97,7 @@ export default function HomePage() {
                 O coracao de S. Joao das Lampas
               </h2>
               <p className="text-base text-[var(--text-secondary)] leading-relaxed">
-                Ha mais de um seculo, a SRDFSIL e o ponto de encontro da nossa comunidade. 
+                Ha mais de um seculo, a SRDFSJL e o ponto de encontro da nossa comunidade. 
                 Um espaco onde se vive o desporto, a cultura e a tradicao.
               </p>
             </div>
