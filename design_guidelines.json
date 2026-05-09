@@ -1,0 +1,84 @@
+{
+  "project_name": "SRDFSIL Website",
+  "theme": "LIGHT",
+  "archetype": "1 (Organic & Earthy - Heritage Variant)",
+  "design_philosophy": "A fusion of 1911 historic Portuguese heritage with modern community utility. We use the official deep green (#0d6b4f) anchored by warm bone-white backgrounds. Photography takes center stage with cinematic, textural elements, emphasizing 'E1' principles: Contrast (Classic Serif vs Modern Sans), Negative Space, and Zoom In (details of history and community).",
+  "colors": {
+    "background": "#F9F8F6",
+    "surface": "#FFFFFF",
+    "surface_secondary": "#F0EFEB",
+    "primary": "#0d6b4f",
+    "primary_hover": "#0a5640",
+    "accent": "#D97742",
+    "text_primary": "#111814",
+    "text_secondary": "#4A5A52",
+    "border": "#E5E4E0",
+    "overlay": "rgba(17, 24, 20, 0.4)"
+  },
+  "typography": {
+    "font_families": {
+      "heading": "Cormorant Garamond, serif",
+      "body": "Outfit, sans-serif"
+    },
+    "hierarchy": {
+      "h1": "text-5xl sm:text-6xl tracking-tight font-light text-primary",
+      "h2": "text-4xl sm:text-5xl tracking-tight font-medium text-text_primary",
+      "h3": "text-2xl sm:text-3xl font-medium text-text_primary",
+      "body_large": "text-lg sm:text-xl leading-relaxed text-text_secondary",
+      "body": "text-base leading-relaxed text-text_secondary",
+      "overline": "text-xs uppercase tracking-[0.2em] font-semibold text-accent"
+    }
+  },
+  "layout_and_spacing": {
+    "spacing_scale": "Use p-8, p-12, p-16, p-24 for section padding. Generous negative space.",
+    "grid_system": "Bento grids for Services section (grid-cols-1 md:grid-cols-12, gap-8). Asymmetrical layouts for History page.",
+    "corners": "rounded-sm (2px) to rounded-none. Avoid heavy rounding to maintain a classic, grounded feel."
+  },
+  "surfaces_and_effects": {
+    "cards": "Flat surfaces with 1px delicate borders (border-border). No heavy drop shadows. Tactile and sharp.",
+    "hero_overlay": "bg-black/40 mixed with a very subtle green tint to ensure text readability.",
+    "hover_states": "-translate-y-1 transition-transform duration-300 ease-out, border-primary/50"
+  },
+  "image_urls": {
+    "hero_banner": {
+      "url": "https://images.unsplash.com/photo-1759139908428-57e41f756f05?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzF8MHwxfHNlYXJjaHwxfHxoaXN0b3JpYyUyMGV1cm9wZWFuJTIwYnVpbGRpbmd8ZW58MHx8fHwxNzc4MzUzMzkyfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Historic stone building with classical details for the homepage hero background.",
+      "category": "hero"
+    },
+    "history_1911": {
+      "url": "https://images.unsplash.com/photo-1774891937673-9186e930a18e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwyfHx2aW50YWdlJTIwbGV0dGVyJTIwd2F4JTIwc2VhbHxlbnwwfHx8fDE3NzgzNTMzOTZ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Vintage wax seal to represent the 1911 foundation on the History section.",
+      "category": "history"
+    },
+    "theater_service": {
+      "url": "https://images.pexels.com/photos/19658083/pexels-photo-19658083.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Illuminated stage in an empty classic theater for the Theater Group service.",
+      "category": "service"
+    },
+    "sports_service": {
+      "url": "https://images.unsplash.com/photo-1771909719482-4f95e62f41a7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwyfHxpbmRvb3IlMjBzcG9ydHMlMjBoYWxsfGVufDB8fHx8MTc3ODM1MzM5Mnww&ixlib=rb-4.1.0&q=85",
+      "description": "Empty indoor sports arena for the Sports service.",
+      "category": "service"
+    },
+    "hall_rental": {
+      "url": "https://images.unsplash.com/photo-1778086170602-f40da010e5fb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwyfHxjb21tdW5pdHklMjBnYXRoZXJpbmclMjBoYWxsfGVufDB8fHx8MTc3ODM1MzM5Nnww&ixlib=rb-4.1.0&q=85",
+      "description": "Wood-paneled room with chairs for Hall Rental service.",
+      "category": "service"
+    }
+  },
+  "components": {
+    "navigation": "Sticky, Glassmorphism (bg-white/80 backdrop-blur-xl border-b border-border). Contains Logo (Cormorant Garamond), Main Links, and 'Join Now' CTA.",
+    "buttons": "Primary: bg-primary text-white hover:bg-primary_hover rounded-none px-6 py-3 font-medium tracking-wide. Secondary: border border-primary text-primary hover:bg-primary/5.",
+    "forms": "Use Shadcn components but strip standard Vercel look. Use square corners, bg-white inputs with border-border, focus:ring-primary focus:border-primary.",
+    "events_calendar": "Minimalist grid. Highlight dates with green accents. Use clear typography and ample padding.",
+    "admin_dashboard": "Clean, high-contrast utility layout (Archetype 4 variant). White background, 1px borders, dense data presentation."
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the color palette, using the official green (#0d6b4f) primarily for accents, buttons, and section backgrounds.",
+    "Ensure headings use Cormorant Garamond with tight tracking, and body text uses Outfit.",
+    "Incorporate the provided image URLs exactly as mapped. Do not use generic placeholders.",
+    "Add 'data-testid' attributes to all interactive elements (buttons, links, form inputs) as per testing rules.",
+    "For the hero banner, apply the bg-black/40 overlay to ensure text contrast over the historic building image.",
+    "Construct the Services section using a 'Bento' or asymmetrical grid, featuring the Theater, Sports, and Hall Rental images."
+  ]
+}
