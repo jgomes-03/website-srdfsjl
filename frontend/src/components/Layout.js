@@ -44,8 +44,8 @@ function Header() {
               className={`object-contain transition-all duration-300 ${scrolled ? "w-9 h-9" : "w-14 h-14"}`}
             />
             {scrolled && (
-              <span className={`text-[13px] font-semibold tracking-tight hidden sm:block transition-colors leading-tight ${textColor}`}>
-                Sociedade Recreativa Desportiva<br/>e Familiar de S. João das Lampas
+              <span className={`text-[13px] font-semibold tracking-tight hidden sm:block transition-colors whitespace-nowrap ${textColor}`}>
+                Sociedade Recreativa Desportiva de Familiar de S. João das Lampas
               </span>
             )}
           </Link>
