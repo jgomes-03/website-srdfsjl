@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import SRDFSILLogo from "@/components/SRDFSILLogo";
+
+const LOGO = "https://customer-assets.emergentagent.com/job_sao-joao-lampas/artifacts/31zt6imn_minilogo-transparente.png";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -11,73 +12,31 @@ export default function AdminLoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      await login(email, password);
-      navigate("/admin");
-    } catch (err) {
-      const detail = err.response?.data?.detail;
-      setError(typeof detail === "string" ? detail : "Credenciais invalidas");
-    } finally {
-      setLoading(false);
-    }
+  const submit = async (e) => {
+    e.preventDefault(); setLoading(true); setError("");
+    try { await login(email, password); navigate("/admin"); }
+    catch (err) { const d = err.response?.data?.detail; setError(typeof d === "string" ? d : "Credenciais invalidas"); }
+    finally { setLoading(false); }
   };
 
+  const inp = "w-full px-4 py-3 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg)] outline-none transition-all focus:border-[var(--green-700)] focus:ring-2 focus:ring-[var(--green-700)]/10";
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden" style={{ backgroundColor: "var(--bg)" }}>
-      {/* Background decorative */}
-      <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full opacity-5" style={{ backgroundColor: "var(--primary)" }} />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full opacity-5" style={{ backgroundColor: "var(--accent)" }} />
-
-      <div className="w-full max-w-md p-10 rounded-2xl border shadow-xl relative z-10" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-        <div className="text-center mb-10">
-          <SRDFSILLogo size={64} className="mx-auto mb-5" />
-          <h1 className="text-3xl font-medium" style={{ fontFamily: "'Cormorant Garamond', serif", color: "var(--text-primary)" }}>
-            Administracao
-          </h1>
-          <p className="text-sm mt-2" style={{ color: "var(--text-secondary)" }}>Acesso restrito</p>
+    <div className="min-h-screen flex items-center justify-center px-5 bg-[var(--bg)]">
+      <div className="w-full max-w-sm bg-white rounded-xl border border-[var(--border)] p-8 shadow-sm">
+        <div className="text-center mb-8">
+          <img src={LOGO} alt="SRDFSIL" className="w-12 h-12 mx-auto mb-4 object-contain" />
+          <h1 className="text-xl font-bold text-[var(--text-primary)]">Administracao</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Acesso restrito</p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5" data-testid="admin-login-form">
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-primary)" }}>Email</label>
-            <input
-              type="email"
-              data-testid="admin-email-input"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-5 py-3.5 text-sm rounded-xl border outline-none transition-all duration-300 focus:ring-2 focus:ring-opacity-30"
-              style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", "--tw-ring-color": "var(--primary)" }}
-              placeholder="admin@srdfsil.pt"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-primary)" }}>Password</label>
-            <input
-              type="password"
-              data-testid="admin-password-input"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-5 py-3.5 text-sm rounded-xl border outline-none transition-all duration-300 focus:ring-2 focus:ring-opacity-30"
-              style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", "--tw-ring-color": "var(--primary)" }}
-              placeholder="********"
-            />
-          </div>
+        <form onSubmit={submit} className="space-y-4" data-testid="admin-login-form">
+          <div><label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Email</label><input type="email" data-testid="admin-email-input" required value={email} onChange={e => setEmail(e.target.value)} className={inp} placeholder="admin@srdfsil.pt" /></div>
+          <div><label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Password</label><input type="password" data-testid="admin-password-input" required value={password} onChange={e => setPassword(e.target.value)} className={inp} placeholder="********" /></div>
           {error && <p data-testid="admin-login-error" className="text-sm text-red-600">{error}</p>}
-          <button
-            type="submit"
-            data-testid="admin-login-btn"
-            disabled={loading}
-            className="w-full py-4 text-sm font-semibold text-white tracking-wide rounded-full btn-glow transition-all duration-300 hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
-            style={{ backgroundColor: "var(--primary)" }}
-          >
-            {loading ? "A entrar..." : "Entrar"}
-          </button>
+          <button type="submit" data-testid="admin-login-btn" disabled={loading}
+            className="w-full py-3.5 text-sm font-semibold text-white rounded-lg btn-shine transition-all hover:brightness-110 disabled:opacity-50"
+            style={{ backgroundColor: "var(--green-700)" }}
+          >{loading ? "A entrar..." : "Entrar"}</button>
         </form>
       </div>
     </div>

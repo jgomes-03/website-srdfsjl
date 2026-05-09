@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Calendar, Clock, MapPin } from "lucide-react";
 import axios from "axios";
-import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-function RevealSection({ children, className = "", delay = 0 }) {
-  const [ref, visible] = useScrollReveal(0.1);
-  return (
-    <div ref={ref} className={`reveal ${visible ? "visible" : ""} ${className}`} style={{ transitionDelay: `${delay}ms` }}>
-      {children}
-    </div>
-  );
+function SR({ children, className = "", delay = 0 }) {
+  const ref = useRef(null);
+  const [v, setV] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setV(true); }, { threshold: 0.1 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return <div ref={ref} className={`sr ${v ? "visible" : ""} ${className}`} style={{ transitionDelay: `${delay}ms` }}>{children}</div>;
 }
 
 export default function EventosPage() {
@@ -26,70 +29,58 @@ export default function EventosPage() {
   const today = new Date().toISOString().split("T")[0];
   const upcoming = events.filter(e => e.date >= today);
   const past = events.filter(e => e.date < today);
-  const displayed = filter === "upcoming" ? upcoming : filter === "past" ? past : events;
+  const shown = filter === "upcoming" ? upcoming : filter === "past" ? past : events;
 
   return (
     <div>
-      <section className="relative py-24 sm:py-32 overflow-hidden" style={{ background: "linear-gradient(135deg, var(--primary) 0%, #1a9d74 50%, var(--primary) 100%)" }}>
-        <div className="absolute inset-0 noise-overlay" />
-        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center">
-          <p className="text-xs uppercase tracking-[0.4em] font-semibold mb-4" style={{ color: "var(--accent)" }}>Agenda</p>
-          <h1 className="text-4xl sm:text-7xl font-light text-white animate-fade-in-up" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
-            Eventos
-          </h1>
+      <section className="pt-32 pb-16 sm:pt-40 sm:pb-20 bg-[var(--green-900)]">
+        <div className="max-w-4xl mx-auto px-5 sm:px-8 text-center">
+          <span className="inline-block text-xs font-semibold tracking-widest uppercase text-[var(--green-500)] mb-3">Agenda</span>
+          <h1 className="text-4xl sm:text-6xl font-bold text-white anim-fade-up d1">Eventos</h1>
         </div>
       </section>
 
-      {/* Filter */}
-      <section className="py-6 sticky top-20 z-30 glass border-b" style={{ borderColor: "var(--border)" }}>
-        <div className="max-w-7xl mx-auto px-4 flex gap-3 items-center justify-center">
+      <section className="sticky top-[72px] z-30 bg-white/90 backdrop-blur-xl border-b border-[var(--border-light)] py-4">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 flex gap-2 justify-center">
           {[
-            { value: "all", label: "Todos" },
-            { value: "upcoming", label: "Proximos" },
-            { value: "past", label: "Passados" },
-          ].map((f) => (
+            { v: "all", l: "Todos" },
+            { v: "upcoming", l: `Proximos${upcoming.length ? ` (${upcoming.length})` : ""}` },
+            { v: "past", l: "Passados" },
+          ].map(f => (
             <button
-              key={f.value}
-              data-testid={`filter-${f.value}`}
-              onClick={() => setFilter(f.value)}
-              className="px-6 py-2.5 text-sm font-medium tracking-wide rounded-full transition-all duration-300"
-              style={{
-                backgroundColor: filter === f.value ? "var(--primary)" : "transparent",
-                color: filter === f.value ? "white" : "var(--text-secondary)",
-                border: filter === f.value ? "none" : "1px solid var(--border)",
-              }}
+              key={f.v}
+              data-testid={`filter-${f.v}`}
+              onClick={() => setFilter(f.v)}
+              className={`px-5 py-2 text-sm font-medium rounded-lg transition-all ${
+                filter === f.v
+                  ? "bg-[var(--green-700)] text-white"
+                  : "bg-transparent text-[var(--text-secondary)] border border-[var(--border)] hover:border-[var(--green-700)]/30"
+              }`}
             >
-              {f.label}
-              {f.value === "upcoming" && upcoming.length > 0 && (
-                <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: filter === f.value ? "rgba(255,255,255,0.2)" : "var(--primary-light)", color: filter === f.value ? "white" : "var(--primary)" }}>
-                  {upcoming.length}
-                </span>
-              )}
+              {f.l}
             </button>
           ))}
         </div>
       </section>
 
       <section data-testid="events-list" className="py-16 sm:py-24">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <div className="max-w-4xl mx-auto px-5 sm:px-8">
           {loading ? (
             <div className="text-center py-16">
-              <div className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }} />
+              <div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin mx-auto" />
             </div>
-          ) : displayed.length > 0 ? (
-            <div className="space-y-5">
-              {displayed.map((event, i) => (
-                <RevealSection key={event.id} delay={i * 100}>
-                  <EventRow event={event} isPast={event.date < today} />
-                </RevealSection>
+          ) : shown.length > 0 ? (
+            <div className="space-y-4">
+              {shown.map((ev, i) => (
+                <SR key={ev.id} delay={i * 80}>
+                  <EvRow event={ev} isPast={ev.date < today} />
+                </SR>
               ))}
             </div>
           ) : (
             <div className="text-center py-24">
-              <Calendar size={52} className="mx-auto mb-5 opacity-15" />
-              <p className="text-lg" style={{ color: "var(--text-secondary)" }}>
-                Nao existem eventos {filter === "upcoming" ? "futuros" : filter === "past" ? "passados" : ""} de momento.
-              </p>
+              <Calendar size={40} className="mx-auto mb-4 text-[var(--text-muted)]" />
+              <p className="text-[var(--text-secondary)]">Sem eventos de momento.</p>
             </div>
           )}
         </div>
@@ -98,57 +89,28 @@ export default function EventosPage() {
   );
 }
 
-function EventRow({ event, isPast }) {
-  const formatDate = (dateStr) => {
-    const d = new Date(dateStr + "T00:00:00");
-    const months = ["Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-    const days = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
-    return { day: d.getDate(), month: months[d.getMonth()], weekday: days[d.getDay()] };
-  };
-  const { day, month, weekday } = formatDate(event.date);
+function EvRow({ event, isPast }) {
+  const d = new Date(event.date + "T00:00:00");
+  const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 
   return (
     <div
       data-testid={`event-row-${event.id}`}
-      className={`flex flex-col sm:flex-row rounded-xl overflow-hidden border hover-lift ${isPast ? "opacity-50" : ""}`}
-      style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
+      className={`flex items-stretch rounded-xl bg-white border border-[var(--border)] overflow-hidden lift ${isPast ? "opacity-50" : ""}`}
     >
-      <div
-        className="flex items-center gap-4 px-7 py-6 sm:min-w-[180px] sm:flex-col sm:justify-center sm:gap-1"
-        style={{
-          background: isPast
-            ? "linear-gradient(135deg, #6b7280, #9ca3af)"
-            : "linear-gradient(135deg, var(--primary), #1a9d74)",
-          color: "white",
-        }}
-      >
-        <span className="text-4xl font-light" style={{ fontFamily: "'Cormorant Garamond', serif" }}>{day}</span>
-        <div className="sm:text-center">
-          <span className="text-sm font-medium">{month}</span>
-          <span className="block text-xs opacity-50">{weekday}</span>
-        </div>
+      <div className={`flex flex-col items-center justify-center px-6 py-5 min-w-[90px] text-white ${isPast ? "bg-[var(--text-muted)]" : "bg-[var(--green-700)]"}`}>
+        <span className="text-2xl font-bold leading-none">{d.getDate()}</span>
+        <span className="text-[10px] font-semibold uppercase mt-0.5">{months[d.getMonth()]}</span>
+        <span className="text-[9px] opacity-50 mt-0.5">{days[d.getDay()]}</span>
       </div>
-      <div className="flex-1 px-7 py-6">
-        <h3 className="text-xl font-medium mb-2" style={{ fontFamily: "'Cormorant Garamond', serif", color: "var(--text-primary)" }}>
-          {event.title}
-        </h3>
-        <p className="text-sm mb-4 line-clamp-2" style={{ color: "var(--text-secondary)" }}>{event.description}</p>
-        <div className="flex flex-wrap gap-3 text-[11px]" style={{ color: "var(--text-secondary)" }}>
-          {event.time && (
-            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full" style={{ backgroundColor: "var(--surface-secondary)" }}>
-              <Clock size={11} /> {event.time}
-            </span>
-          )}
-          {event.location && (
-            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full" style={{ backgroundColor: "var(--surface-secondary)" }}>
-              <MapPin size={11} /> {event.location}
-            </span>
-          )}
-          {event.price && (
-            <span className="font-bold px-3 py-1 rounded-full text-white" style={{ backgroundColor: "var(--accent)" }}>
-              {event.price}
-            </span>
-          )}
+      <div className="flex-1 px-6 py-5">
+        <h3 className="text-base font-semibold text-[var(--text-primary)] mb-1">{event.title}</h3>
+        <p className="text-sm text-[var(--text-secondary)] line-clamp-2 mb-3">{event.description}</p>
+        <div className="flex flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
+          {event.time && <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--surface-alt)]"><Clock size={10} />{event.time}</span>}
+          {event.location && <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--surface-alt)]"><MapPin size={10} />{event.location}</span>}
+          {event.price && <span className="font-semibold px-2 py-0.5 rounded text-[var(--green-700)] bg-[var(--green-100)]">{event.price}</span>}
         </div>
       </div>
     </div>

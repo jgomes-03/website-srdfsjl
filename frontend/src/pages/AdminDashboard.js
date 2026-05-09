@@ -21,8 +21,8 @@ export default function AdminDashboard() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "var(--bg)" }}>
-        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }} />
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+        <div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -37,42 +37,31 @@ export default function AdminDashboard() {
   const TABS = [
     { id: "events", label: "Eventos", icon: Calendar },
     { id: "gallery", label: "Galeria", icon: Image },
-    { id: "members", label: "Sócios", icon: Users },
+    { id: "members", label: "Socios", icon: Users },
     { id: "contacts", label: "Mensagens", icon: Mail },
   ];
 
   return (
-    <div className="min-h-screen flex" style={{ backgroundColor: "var(--bg)" }}>
+    <div className="min-h-screen flex bg-[var(--bg)]">
       {/* Sidebar */}
-      <aside
-        className="w-64 min-h-screen flex flex-col border-r"
-        style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}
-        data-testid="admin-sidebar"
-      >
-        <div className="p-6 border-b" style={{ borderColor: "var(--border)" }}>
+      <aside className="w-60 min-h-screen flex flex-col border-r border-[var(--border)] bg-white" data-testid="admin-sidebar">
+        <div className="p-5 border-b border-[var(--border)]">
           <div className="flex items-center gap-2">
-            <LayoutDashboard size={20} style={{ color: "var(--primary)" }} />
-            <h2
-              className="text-lg font-medium"
-              style={{ fontFamily: "'Cormorant Garamond', serif", color: "var(--text-primary)" }}
-            >
-              Admin SRDFSIL
-            </h2>
+            <LayoutDashboard size={18} className="text-[var(--green-700)]" />
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">Admin SRDFSIL</h2>
           </div>
-          <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>{user.email}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">{user.email}</p>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-3 space-y-0.5">
           {TABS.map((t) => (
             <button
               key={t.id}
               data-testid={`admin-tab-${t.id}`}
               onClick={() => setTab(t.id)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: tab === t.id ? "var(--primary)" : "transparent",
-                color: tab === t.id ? "white" : "var(--text-secondary)",
-              }}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                tab === t.id ? "bg-[var(--green-700)] text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
+              }`}
             >
               <t.icon size={16} />
               {t.label}
@@ -80,12 +69,11 @@ export default function AdminDashboard() {
           ))}
         </nav>
 
-        <div className="p-4 border-t" style={{ borderColor: "var(--border)" }}>
+        <div className="p-3 border-t border-[var(--border)]">
           <button
             data-testid="admin-logout-btn"
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-70"
-            style={{ color: "var(--text-secondary)" }}
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium text-[var(--text-muted)] rounded-lg hover:bg-[var(--surface-alt)] transition-colors"
           >
             <LogOut size={16} />
             Sair
@@ -146,14 +134,14 @@ function EventsTab() {
   return (
     <div data-testid="admin-events-tab">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-medium" style={{ fontFamily: "'Cormorant Garamond', serif", color: "var(--text-primary)" }}>
+        <h1 className="text-2xl font-medium" style={{ color: "var(--text-primary)" }}>
           Gerir Eventos
         </h1>
         <button
           data-testid="add-event-btn"
           onClick={() => { resetForm(); setShowForm(true); }}
           className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white"
-          style={{ backgroundColor: "var(--primary)" }}
+          style={{ backgroundColor: "var(--green-700)" }}
         >
           <Plus size={16} /> Novo Evento
         </button>
@@ -161,7 +149,7 @@ function EventsTab() {
 
       {showForm && (
         <div className="mb-8 p-6 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-          <h3 className="text-lg font-medium mb-4" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+          <h3 className="text-lg font-medium mb-4" style={{  }}>
             {editingId ? "Editar Evento" : "Novo Evento"}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -188,7 +176,7 @@ function EventsTab() {
               data-testid="event-form-save"
               onClick={handleSave}
               className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--primary)" }}
+              style={{ backgroundColor: "var(--green-700)" }}
             >
               <Save size={14} /> Guardar
             </button>
@@ -212,7 +200,7 @@ function EventsTab() {
               <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>{event.date} {event.time && `| ${event.time}`} {event.location && `| ${event.location}`}</p>
             </div>
             <div className="flex gap-2">
-              <button data-testid={`edit-event-${event.id}`} onClick={() => handleEdit(event)} className="p-2 hover:opacity-70" style={{ color: "var(--primary)" }}>
+              <button data-testid={`edit-event-${event.id}`} onClick={() => handleEdit(event)} className="p-2 hover:opacity-70" style={{ color: "var(--green-700)" }}>
                 <Edit2 size={16} />
               </button>
               <button data-testid={`delete-event-${event.id}`} onClick={() => handleDelete(event.id)} className="p-2 hover:opacity-70 text-red-500">
@@ -252,14 +240,14 @@ function GalleryTab() {
   return (
     <div data-testid="admin-gallery-tab">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-medium" style={{ fontFamily: "'Cormorant Garamond', serif", color: "var(--text-primary)" }}>
+        <h1 className="text-2xl font-medium" style={{ color: "var(--text-primary)" }}>
           Gerir Galeria
         </h1>
         <button
           data-testid="add-gallery-btn"
           onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white"
-          style={{ backgroundColor: "var(--primary)" }}
+          style={{ backgroundColor: "var(--green-700)" }}
         >
           <Plus size={16} /> Nova Imagem
         </button>
@@ -274,7 +262,7 @@ function GalleryTab() {
             <InputField label="Categoria" value={form.category} onChange={v => setForm({...form, category: v})} testId="gallery-form-category" placeholder="ex: Eventos, Teatro" />
           </div>
           <div className="flex gap-3 mt-4">
-            <button data-testid="gallery-form-save" onClick={handleSave} className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white" style={{ backgroundColor: "var(--primary)" }}>
+            <button data-testid="gallery-form-save" onClick={handleSave} className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white" style={{ backgroundColor: "var(--green-700)" }}>
               <Save size={14} /> Guardar
             </button>
             <button onClick={() => setShowForm(false)} className="flex items-center gap-2 px-5 py-2 text-sm font-medium border" style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}>
@@ -291,7 +279,7 @@ function GalleryTab() {
             <div className="p-3 flex items-center justify-between">
               <div>
                 <h4 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{item.title}</h4>
-                {item.category && <span className="text-xs" style={{ color: "var(--accent)" }}>{item.category}</span>}
+                {item.category && <span className="text-xs" style={{ color: "var(--green-500)" }}>{item.category}</span>}
               </div>
               <button data-testid={`delete-gallery-${item.id}`} onClick={() => handleDelete(item.id)} className="p-2 hover:opacity-70 text-red-500">
                 <Trash2 size={16} />
@@ -313,7 +301,7 @@ function MembersTab() {
 
   return (
     <div data-testid="admin-members-tab">
-      <h1 className="text-2xl font-medium mb-8" style={{ fontFamily: "'Cormorant Garamond', serif", color: "var(--text-primary)" }}>
+      <h1 className="text-2xl font-medium mb-8" style={{ color: "var(--text-primary)" }}>
         Inscrições de Sócios
       </h1>
       {members.length > 0 ? (
@@ -327,7 +315,7 @@ function MembersTab() {
                   {m.address && <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{m.address}</p>}
                   {m.message && <p className="text-xs mt-1 italic" style={{ color: "var(--text-secondary)" }}>"{m.message}"</p>}
                 </div>
-                <span className="text-xs px-2 py-1 font-medium" style={{ backgroundColor: "var(--accent)", color: "white" }}>
+                <span className="text-xs px-2 py-1 font-medium" style={{ backgroundColor: "var(--green-500)", color: "white" }}>
                   {m.status}
                 </span>
               </div>
@@ -350,7 +338,7 @@ function ContactsTab() {
 
   return (
     <div data-testid="admin-contacts-tab">
-      <h1 className="text-2xl font-medium mb-8" style={{ fontFamily: "'Cormorant Garamond', serif", color: "var(--text-primary)" }}>
+      <h1 className="text-2xl font-medium mb-8" style={{ color: "var(--text-primary)" }}>
         Mensagens de Contacto
       </h1>
       {contacts.length > 0 ? (
@@ -382,14 +370,13 @@ function ContactsTab() {
 function InputField({ label, value, onChange, testId, type = "text", placeholder = "" }) {
   return (
     <div>
-      <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-primary)" }}>{label}</label>
+      <label className="block text-xs font-medium text-[var(--text-primary)] mb-1">{label}</label>
       <input
         type={type}
         data-testid={testId}
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 text-sm border outline-none"
-        style={{ borderColor: "var(--border)" }}
+        className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] outline-none transition-all focus:border-[var(--green-700)]"
         placeholder={placeholder}
       />
     </div>
