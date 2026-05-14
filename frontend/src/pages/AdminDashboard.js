@@ -5,6 +5,7 @@ import {
   LogOut, LayoutDashboard, Calendar, Briefcase, Clock as ClockIcon, Mail, Settings, Users,
   Plus, Trash2, Edit2, Save, X, Check, Eye, Reply, ExternalLink, Search,
   TrendingUp, MessageSquare, UserPlus, CalendarDays, ChevronRight, Bell, Home,
+  ChevronDown, CreditCard, Receipt, ArrowLeft,
 } from "lucide-react";
 import axios from "axios";
 
@@ -492,125 +493,185 @@ function MembersTab({ showToast }) {
   const [form, setForm] = useState({});
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [selectedSocio, setSelectedSocio] = useState(null);
 
   const fetchMembers = useCallback(() => ax.get("/members").then(r => setMembers(r.data)), []);
   const fetchSocios = useCallback(async () => {
     setDvLoading(true);
     try {
-      const st = await ax.get("/dataverse/status");
-      setDvStatus(st.data);
+      const st = await ax.get("/dataverse/status"); setDvStatus(st.data);
       if (st.data.configured) { const r = await ax.get("/dataverse/socios"); setSocios(Array.isArray(r.data) ? r.data : []); }
     } catch { setDvStatus({ configured: false, message: "Erro ao conectar" }); }
     finally { setDvLoading(false); }
   }, []);
   useEffect(() => { fetchMembers(); fetchSocios(); }, [fetchMembers, fetchSocios]);
 
-  const emptyForm = () => ({ cr56f_registrationnumber: "", cr56f_fullname: "", cr56f_estadosocio: "", cr56f_dateofbirth: "", cr56f_phonenumber: "", cr56f_email: "", cr56f_arruamento: "", cr56f_nporta: "", cr56f_postalcode: "", cr56f_city: "", cr56f_registrationyear: new Date().toISOString().split("T")[0], cr56f_observations: "" });
+  const emptyForm = () => ({ cr56f_registrationnumber: "", cr56f_fullname: "", cr56f_estadosocio: "", cr56f_dateofbirth: "", cr56f_phonenumber: "", cr56f_email: "", cr56f_arruamento: "", cr56f_nporta: "", cr56f_postalcode: "", cr56f_city: "", cr56f_registrationyear: "", cr56f_observations: "" });
   const startNew = () => { setForm(emptyForm()); setEditId(null); setShowForm(true); };
-  const startEdit = (s) => { const f = {}; Object.keys(emptyForm()).forEach(k => { f[k] = s[k] ?? ""; }); setEditId(s[Object.keys(s).find(k => k.endsWith("id") && k.startsWith("cr56f_"))] || ""); setForm(f); setShowForm(true); };
+  const startEdit = (e, s) => { e.stopPropagation(); const f = {}; Object.keys(emptyForm()).forEach(k => { f[k] = s[k] ?? ""; }); setEditId(s.cr56f_sociosv2id || ""); setForm(f); setShowForm(true); };
   const cancel = () => { setShowForm(false); setEditId(null); };
   const saveSocio = async () => {
     setSaving(true);
     try { if (editId) await ax.put(`/dataverse/socios/${editId}`, form); else await ax.post("/dataverse/socios", form); cancel(); fetchSocios(); showToast(editId ? "Socio atualizado!" : "Socio criado!"); }
-    catch (e) { showToast(e.response?.data?.detail || "Erro ao guardar", "error"); }
+    catch (e2) { showToast(e2.response?.data?.detail || "Erro", "error"); }
     finally { setSaving(false); }
   };
-  const updateMemberStatus = async (id, status) => { await ax.put(`/members/${id}/status`, { status }); fetchMembers(); showToast("Estado atualizado!"); };
+  const updateMemberStatus = async (id, status) => { await ax.put(`/members/${id}/status`, { status }); fetchMembers(); showToast("Atualizado!"); };
   const filtered = socios.filter(s => { if (!search) return true; const q = search.toLowerCase(); return (s.cr56f_fullname || "").toLowerCase().includes(q) || (s.cr56f_email || "").toLowerCase().includes(q) || String(s.cr56f_registrationnumber || "").includes(q); });
-  const statusColors = { pending: "bg-yellow-50 text-yellow-700", approved: "bg-green-50 text-[var(--green-700)]", rejected: "bg-red-50 text-red-600" };
-  const statusLabels = { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado" };
+  const stColors = { pending: "bg-yellow-50 text-yellow-700", approved: "bg-green-50 text-[var(--green-700)]", rejected: "bg-red-50 text-red-600" };
+  const stLabels = { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado" };
   const FIELDS = [
     { key: "cr56f_registrationnumber", label: "Num. Socio" }, { key: "cr56f_fullname", label: "Nome *", w: true }, { key: "cr56f_estadosocio", label: "Estado" },
     { key: "cr56f_dateofbirth", label: "Data Nasc.", type: "date" }, { key: "cr56f_phonenumber", label: "Telemovel" }, { key: "cr56f_email", label: "Email" },
-    { key: "cr56f_arruamento", label: "Arruamento", w: true }, { key: "cr56f_nporta", label: "Num. Porta" }, { key: "cr56f_postalcode", label: "Cod. Postal" },
-    { key: "cr56f_city", label: "Localidade" }, { key: "cr56f_registrationyear", label: "Data Inscricao", type: "date" }, { key: "cr56f_observations", label: "Observacoes", w: true, rows: 2 },
+    { key: "cr56f_arruamento", label: "Arruamento", w: true }, { key: "cr56f_nporta", label: "Porta" }, { key: "cr56f_postalcode", label: "Cod. Postal" },
+    { key: "cr56f_city", label: "Localidade" }, { key: "cr56f_registrationyear", label: "Ano Inscricao" }, { key: "cr56f_observations", label: "Observacoes", w: true, rows: 2 },
   ];
+
+  if (selectedSocio) return <SocioDetail socio={selectedSocio} onBack={() => setSelectedSocio(null)} showToast={showToast} />;
 
   return (
     <div data-testid="admin-members-tab">
       <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-gray-400">Gestao completa de socios.</p>
+        <p className="text-sm text-gray-400">Gestao completa de socios e quotas.</p>
         <div className="flex gap-2">
-          <button onClick={() => setView("dataverse")} data-testid="members-view-dataverse"
-            className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${view === "dataverse" ? "bg-[var(--green-700)] text-white shadow-sm" : "bg-white border border-gray-200 text-gray-400"}`}>Dataverse</button>
-          <button onClick={() => setView("inscricoes")} data-testid="members-view-inscricoes"
-            className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${view === "inscricoes" ? "bg-[var(--green-700)] text-white shadow-sm" : "bg-white border border-gray-200 text-gray-400"}`}>Inscricoes ({members.filter(m => m.status === "pending").length})</button>
+          <button onClick={() => setView("dataverse")} data-testid="members-view-dataverse" className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${view === "dataverse" ? "bg-[var(--green-700)] text-white shadow-sm" : "bg-white border border-gray-200 text-gray-400"}`}>Dataverse</button>
+          <button onClick={() => setView("inscricoes")} data-testid="members-view-inscricoes" className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${view === "inscricoes" ? "bg-[var(--green-700)] text-white shadow-sm" : "bg-white border border-gray-200 text-gray-400"}`}>Inscricoes ({members.filter(m => m.status === "pending").length})</button>
         </div>
       </div>
       {view === "dataverse" ? (
         <div>
-          {dvStatus && !dvStatus.configured && (
-            <Card className="p-5 mb-5 border-l-4 border-l-amber-400">
-              <p className="text-sm font-semibold text-amber-700">Dataverse nao configurado</p>
-              <p className="text-xs text-gray-400 mt-1">{dvStatus.message}</p>
-            </Card>
-          )}
+          {dvStatus && !dvStatus.configured && <Card className="p-5 mb-5 border-l-4 border-l-amber-400"><p className="text-sm font-semibold text-amber-700">Dataverse nao configurado</p><p className="text-xs text-gray-400 mt-1">{dvStatus.message}</p></Card>}
           <div className="flex items-center gap-3 mb-5">
-            <div className="flex-1 relative">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-              <input type="text" placeholder="Pesquisar nome, email, num. socio..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-11 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 bg-white outline-none focus:border-[var(--green-700)] focus:ring-2 focus:ring-[var(--green-700)]/10" data-testid="members-search" />
-            </div>
+            <div className="flex-1 relative"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" /><input type="text" placeholder="Pesquisar..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-11 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 bg-white outline-none focus:border-[var(--green-700)]" data-testid="members-search" /></div>
             <Btn onClick={startNew} testId="add-socio-btn" disabled={dvStatus && !dvStatus.configured}><Plus size={15} />Novo Socio</Btn>
           </div>
           {showForm && (
-            <Card className="p-6 mb-5">
-              <h3 className="text-sm font-bold text-gray-700 mb-4">{editId ? "Editar Socio" : "Novo Socio"}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {FIELDS.map(f => (<div key={f.key} className={f.w ? "sm:col-span-3" : ""}><Inp label={f.label} value={form[f.key] ?? ""} onChange={v => setForm({...form, [f.key]: v})} type={f.type || "text"} rows={f.rows} testId={`socio-form-${f.key}`} /></div>))}
-              </div>
-              <div className="flex gap-3 mt-5">
-                <Btn onClick={saveSocio} disabled={saving} testId="socio-form-save"><Save size={14} />{saving ? "..." : "Guardar"}</Btn>
-                <Btn onClick={cancel} variant="secondary"><X size={14} />Cancelar</Btn>
-              </div>
-            </Card>
+            <Card className="p-6 mb-5"><h3 className="text-sm font-bold text-gray-700 mb-4">{editId ? "Editar" : "Novo"} Socio</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">{FIELDS.map(f => (<div key={f.key} className={f.w ? "sm:col-span-3" : ""}><Inp label={f.label} value={form[f.key] ?? ""} onChange={v => setForm({...form, [f.key]: v})} type={f.type || "text"} rows={f.rows} testId={`socio-form-${f.key}`} /></div>))}</div>
+            <div className="flex gap-3 mt-5"><Btn onClick={saveSocio} disabled={saving} testId="socio-form-save"><Save size={14} />{saving ? "..." : "Guardar"}</Btn><Btn onClick={cancel} variant="secondary"><X size={14} />Cancelar</Btn></div></Card>
           )}
-          {dvLoading ? (
-            <div className="text-center py-16"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin mx-auto" /></div>
-          ) : dvStatus?.configured ? (
+          {dvLoading ? <div className="text-center py-16"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin mx-auto" /></div>
+          : dvStatus?.configured ? (
             <Card className="overflow-hidden">
-              <table className="w-full text-sm" data-testid="socios-table">
-                <thead><tr className="bg-gray-50/80">
-                  {["Num.", "Nome", "Estado", "Telemovel", "Email", "Localidade", ""].map(h => (<th key={h} className="py-3 px-5 text-left font-semibold text-xs text-gray-400 uppercase tracking-wider">{h}</th>))}
-                </tr></thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filtered.map((s, i) => (
-                    <tr key={i} className="hover:bg-gray-50/50 transition-colors group">
-                      <td className="py-3.5 px-5 font-semibold text-gray-700">{s.cr56f_registrationnumber || "-"}</td>
-                      <td className="py-3.5 px-5 text-gray-700">{s.cr56f_fullname || "-"}</td>
-                      <td className="py-3.5 px-5"><span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[var(--green-100)] text-[var(--green-700)]">{s.cr56f_estadosocio || "-"}</span></td>
-                      <td className="py-3.5 px-5 text-gray-400">{s.cr56f_phonenumber || "-"}</td>
-                      <td className="py-3.5 px-5 text-gray-400">{s.cr56f_email || "-"}</td>
-                      <td className="py-3.5 px-5 text-gray-400">{s.cr56f_city || "-"}</td>
-                      <td className="py-3.5 px-5"><button onClick={() => startEdit(s)} className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--green-100)] text-[var(--green-700)] transition-all"><Edit2 size={14} /></button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filtered.length === 0 && <p className="text-sm text-gray-300 text-center py-12">Sem socios encontrados.</p>}
+              <table className="w-full text-sm" data-testid="socios-table"><thead><tr className="bg-gray-50/80">{["Num.", "Nome", "Estado", "Telemovel", "Email", "Localidade", "Quotas", ""].map(h => (<th key={h} className="py-3 px-5 text-left font-semibold text-xs text-gray-400 uppercase tracking-wider">{h}</th>))}</tr></thead>
+              <tbody className="divide-y divide-gray-50">{filtered.map((s, i) => (
+                <tr key={i} className="hover:bg-gray-50/50 transition-colors group cursor-pointer" onClick={() => setSelectedSocio(s)}>
+                  <td className="py-3.5 px-5 font-semibold text-gray-700">{s.cr56f_registrationnumber || "-"}</td>
+                  <td className="py-3.5 px-5 text-gray-700">{s.cr56f_fullname || "-"}</td>
+                  <td className="py-3.5 px-5"><span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[var(--green-100)] text-[var(--green-700)]">{s.cr56f_estadosocio || "-"}</span></td>
+                  <td className="py-3.5 px-5 text-gray-400">{s.cr56f_phonenumber || "-"}</td>
+                  <td className="py-3.5 px-5 text-gray-400">{s.cr56f_email || "-"}</td>
+                  <td className="py-3.5 px-5 text-gray-400">{s.cr56f_city || "-"}</td>
+                  <td className="py-3.5 px-5"><button onClick={(e2) => { e2.stopPropagation(); setSelectedSocio(s); }} className="text-xs font-semibold text-[var(--green-700)] hover:underline flex items-center gap-1"><Receipt size={12} />Ver</button></td>
+                  <td className="py-3.5 px-5"><button onClick={(e2) => startEdit(e2, s)} className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--green-100)] text-[var(--green-700)] transition-all"><Edit2 size={14} /></button></td>
+                </tr>))}</tbody></table>
+              {filtered.length === 0 && <p className="text-sm text-gray-300 text-center py-12">Sem socios.</p>}
               <div className="px-5 py-3 border-t border-gray-50 text-xs text-gray-300">{filtered.length} de {socios.length} socios</div>
             </Card>
-          ) : <Card className="p-12 text-center"><p className="text-sm text-gray-300">Configure o Dataverse para ver os socios.</p></Card>}
+          ) : <Card className="p-12 text-center"><p className="text-sm text-gray-300">Configure o Dataverse.</p></Card>}
         </div>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="divide-y divide-gray-50">
-            {members.map(m => (
-              <div key={m.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50/50 transition-colors group">
-                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 shrink-0">{(m.full_name || "?")[0].toUpperCase()}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2"><p className="text-sm font-semibold text-gray-700">{m.full_name}</p><span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${statusColors[m.status]}`}>{statusLabels[m.status]}</span></div>
-                  <p className="text-xs text-gray-400">{m.email} · {m.phone}</p>
-                </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {m.status !== "approved" && <button onClick={() => updateMemberStatus(m.id, "approved")} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-green-50 text-[var(--green-700)]"><Check size={14} /></button>}
-                  {m.status !== "rejected" && <button onClick={() => updateMemberStatus(m.id, "rejected")} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 text-red-400"><X size={14} /></button>}
-                </div>
-              </div>
-            ))}
-            {members.length === 0 && <p className="text-sm text-gray-300 text-center py-12">Sem inscricoes.</p>}
-          </div>
-        </Card>
+        <Card className="overflow-hidden"><div className="divide-y divide-gray-50">{members.map(m => (
+          <div key={m.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50/50 group">
+            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500">{(m.full_name||"?")[0].toUpperCase()}</div>
+            <div className="flex-1 min-w-0"><div className="flex items-center gap-2"><p className="text-sm font-semibold text-gray-700">{m.full_name}</p><span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${stColors[m.status]}`}>{stLabels[m.status]}</span></div><p className="text-xs text-gray-400">{m.email} · {m.phone}</p></div>
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {m.status !== "approved" && <button onClick={() => updateMemberStatus(m.id, "approved")} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-green-50 text-[var(--green-700)]"><Check size={14} /></button>}
+              {m.status !== "rejected" && <button onClick={() => updateMemberStatus(m.id, "rejected")} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 text-red-400"><X size={14} /></button>}
+            </div></div>
+        ))}{members.length === 0 && <p className="text-sm text-gray-300 text-center py-12">Sem inscricoes.</p>}</div></Card>
       )}
+    </div>
+  );
+}
+
+// ── Socio Detail + Quotas ─────────────────────────────────────────────
+function SocioDetail({ socio, onBack, showToast }) {
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showPayForm, setShowPayForm] = useState(false);
+  const [payForm, setPayForm] = useState({ cr56f_membershipyear: new Date().getFullYear(), cr56f_paymentamount: 12, cr56f_paymentdate: new Date().toISOString().split("T")[0], cr56f_paymentmethod: 1 });
+  const [saving, setSaving] = useState(false);
+  const mid = String(socio.cr56f_registrationnumber || "");
+
+  const fetchPay = useCallback(async () => { setLoading(true); try { const r = await ax.get(`/dataverse/payments?membershipid=${mid}`); setPayments(Array.isArray(r.data) ? r.data : []); } catch { setPayments([]); } finally { setLoading(false); } }, [mid]);
+  useEffect(() => { fetchPay(); }, [fetchPay]);
+
+  const savePay = async () => { setSaving(true); try { await ax.post("/dataverse/payments", { ...payForm, cr56f_membershipid: mid, cr56f_paymentdate: payForm.cr56f_paymentdate + "T00:00:00Z" }); setShowPayForm(false); fetchPay(); showToast("Pagamento registado!"); } catch (e) { showToast(e.response?.data?.detail || "Erro", "error"); } finally { setSaving(false); } };
+  const delPay = async (id) => { if (!window.confirm("Apagar pagamento?")) return; try { await ax.delete(`/dataverse/payments/${id}`); fetchPay(); showToast("Apagado."); } catch { showToast("Erro", "error"); } };
+
+  const methods = { 1: "Numerario", 2: "Transferencia", 3: "MBWay", 4: "Multibanco" };
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("pt-PT") : "-";
+  const byYear = {}; payments.forEach(p => { const y = p.cr56f_membershipyear || "?"; if (!byYear[y]) byYear[y] = []; byYear[y].push(p); });
+  const years = Object.keys(byYear).sort((a, b) => b - a);
+
+  return (
+    <div data-testid="socio-detail">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50" data-testid="back-to-list"><ArrowLeft size={18} className="text-gray-500" /></button>
+        <div className="flex-1"><h2 className="text-xl font-bold text-gray-800">{socio.cr56f_fullname || "Sem nome"}</h2><p className="text-sm text-gray-400">Socio #{mid} · {socio.cr56f_email || ""} · {socio.cr56f_phonenumber || ""}</p></div>
+        <span className="text-xs font-bold px-3 py-1.5 rounded-lg bg-[var(--green-100)] text-[var(--green-700)]">{socio.cr56f_estadosocio || "-"}</span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+        <Card className="p-5"><p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Dados Pessoais</p><div className="space-y-2 text-sm">
+          <div><span className="text-gray-400">Telemovel:</span> <span className="text-gray-700 font-medium">{socio.cr56f_phonenumber || "-"}</span></div>
+          <div><span className="text-gray-400">Email:</span> <span className="text-gray-700 font-medium">{socio.cr56f_email || "-"}</span></div>
+          <div><span className="text-gray-400">Localidade:</span> <span className="text-gray-700 font-medium">{socio.cr56f_city || "-"}</span></div>
+          <div><span className="text-gray-400">Cod. Postal:</span> <span className="text-gray-700 font-medium">{socio.cr56f_postalcode || "-"}</span></div>
+        </div></Card>
+        <Card className="p-5"><p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Inscricao</p><div className="space-y-2 text-sm">
+          <div><span className="text-gray-400">Num. Socio:</span> <span className="text-gray-700 font-medium">{mid}</span></div>
+          <div><span className="text-gray-400">Ano:</span> <span className="text-gray-700 font-medium">{socio.cr56f_registrationyear || "-"}</span></div>
+          <div><span className="text-gray-400">Obs:</span> <span className="text-gray-700 font-medium">{socio.cr56f_observations || "-"}</span></div>
+        </div></Card>
+        <Card className="p-5 flex flex-col items-center justify-center text-center">
+          <CreditCard size={28} className="text-[var(--green-700)] mb-2" />
+          <p className="text-3xl font-bold text-gray-800">{payments.length}</p>
+          <p className="text-xs text-gray-400">Pagamentos</p>
+          {years.length > 0 && <p className="text-xs text-gray-300 mt-0.5">{years[years.length-1]} - {years[0]}</p>}
+        </Card>
+      </div>
+
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="text-base font-bold text-gray-700 flex items-center gap-2"><Receipt size={18} className="text-[var(--green-700)]" /> Historico de Quotas</h3>
+        <Btn onClick={() => setShowPayForm(true)} testId="add-payment-btn"><Plus size={14} />Registar Pagamento</Btn>
+      </div>
+
+      {showPayForm && (
+        <Card className="p-6 mb-5"><h3 className="text-sm font-bold text-gray-700 mb-4">Novo Pagamento</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <Inp label="Ano *" type="number" value={payForm.cr56f_membershipyear} onChange={v => setPayForm({...payForm, cr56f_membershipyear: parseInt(v)||0})} testId="payment-year" />
+          <Inp label="Valor (EUR) *" type="number" value={payForm.cr56f_paymentamount} onChange={v => setPayForm({...payForm, cr56f_paymentamount: parseFloat(v)||0})} testId="payment-amount" />
+          <Inp label="Data *" type="date" value={payForm.cr56f_paymentdate} onChange={v => setPayForm({...payForm, cr56f_paymentdate: v})} testId="payment-date" />
+          <div><label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Metodo</label>
+          <select value={payForm.cr56f_paymentmethod} onChange={e => setPayForm({...payForm, cr56f_paymentmethod: parseInt(e.target.value)})} className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50/50 outline-none focus:border-[var(--green-700)]" data-testid="payment-method">
+            <option value={1}>Numerario</option><option value={2}>Transferencia</option><option value={3}>MBWay</option><option value={4}>Multibanco</option>
+          </select></div>
+        </div>
+        <div className="flex gap-3 mt-5"><Btn onClick={savePay} disabled={saving} testId="payment-form-save"><Save size={14} />{saving ? "..." : "Registar"}</Btn><Btn onClick={() => setShowPayForm(false)} variant="secondary"><X size={14} />Cancelar</Btn></div></Card>
+      )}
+
+      {loading ? <div className="text-center py-12"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin mx-auto" /></div>
+      : payments.length > 0 ? (
+        <div className="space-y-4">{years.map(year => (
+          <Card key={year} className="overflow-hidden">
+            <div className="px-5 py-3 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
+              <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2"><Calendar size={14} className="text-[var(--green-700)]" />{year}</h4>
+              <span className="text-xs text-gray-400">{byYear[year].length} pagamento{byYear[year].length !== 1 ? "s" : ""}</span>
+            </div>
+            <div className="divide-y divide-gray-50">{byYear[year].map((p, i) => (
+              <div key={i} className="px-5 py-3.5 flex items-center gap-4 hover:bg-gray-50/30 group">
+                <div className="w-10 h-10 rounded-xl bg-[var(--green-100)] flex items-center justify-center shrink-0"><CreditCard size={16} className="text-[var(--green-700)]" /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-700">{p.cr56f_paymentamount ? `${p.cr56f_paymentamount} EUR` : "-"}</p>
+                  <p className="text-xs text-gray-400">{fmtDate(p.cr56f_paymentdate)} · {methods[p.cr56f_paymentmethod] || `Metodo ${p.cr56f_paymentmethod}`}</p>
+                </div>
+                {p.cr56f_sagereceiptid && <span className="text-[10px] text-gray-300 font-mono">#{p.cr56f_sagereceiptid}</span>}
+                <button onClick={() => delPay(p.cr56f_paymentsrecordid)} className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-50 text-red-400 transition-all"><Trash2 size={13} /></button>
+              </div>))}</div>
+          </Card>))}</div>
+      ) : <Card className="p-12 text-center"><CreditCard size={32} className="mx-auto text-gray-200 mb-3" /><p className="text-sm text-gray-300">Sem pagamentos registados.</p></Card>}
     </div>
   );
 }

@@ -518,6 +518,36 @@ async def dataverse_status(request: Request):
     except Exception as e:
         return {"configured": False, "message": f"Erro de conexao: {str(e)}"}
 
+# ── Dataverse Payments ───────────────────────────────────────────────────
+@api_router.get("/dataverse/payments")
+async def get_dataverse_payments(request: Request, membershipid: str = ""):
+    await require_admin(request)
+    if membershipid:
+        result = await dataverse_request("GET", f"cr56f_paymentsrecords?$filter=cr56f_membershipid eq '{membershipid}'&$orderby=cr56f_membershipyear desc")
+    else:
+        result = await dataverse_request("GET", "cr56f_paymentsrecords?$top=500&$orderby=cr56f_membershipyear desc")
+    return result.get("value", [])
+
+@api_router.post("/dataverse/payments")
+async def create_dataverse_payment(request: Request):
+    await require_admin(request)
+    body = await request.json()
+    result = await dataverse_request("POST", "cr56f_paymentsrecords", json_data=body)
+    return result
+
+@api_router.put("/dataverse/payments/{record_id}")
+async def update_dataverse_payment(record_id: str, request: Request):
+    await require_admin(request)
+    body = await request.json()
+    result = await dataverse_request("PATCH", f"cr56f_paymentsrecords({record_id})", json_data=body)
+    return result
+
+@api_router.delete("/dataverse/payments/{record_id}")
+async def delete_dataverse_payment(record_id: str, request: Request):
+    await require_admin(request)
+    result = await dataverse_request("DELETE", f"cr56f_paymentsrecords({record_id})")
+    return {"message": "Deleted"}
+
 # ── Health ───────────────────────────────────────────────────────────────
 @api_router.get("/")
 async def root():
