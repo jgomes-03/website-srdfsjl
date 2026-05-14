@@ -8,9 +8,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
+  useEffect(() => { checkAuth(); }, []);
 
   const checkAuth = async () => {
     try {
@@ -29,20 +27,26 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const loginWithMicrosoft = async (accessToken) => {
+    const { data } = await axios.post(`${API}/auth/microsoft`, { access_token: accessToken }, { withCredentials: true });
+    setUser(data);
+    return data;
+  };
+
   const logout = async () => {
     await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, checkAuth }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithMicrosoft, logout, checkAuth }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be within AuthProvider");
+  return ctx;
 }

@@ -345,79 +345,127 @@ function MessagesTab() {
 
 // ── Members ───────────────────────────────────────────────────────────
 function MembersTab() {
+  const [view, setView] = useState("dataverse");
+  const [dvStatus, setDvStatus] = useState(null);
+  const [socios, setSocios] = useState([]);
+  const [dvLoading, setDvLoading] = useState(true);
   const [members, setMembers] = useState([]);
-  const [view, setView] = useState("powerapps");
-  const fetch = useCallback(() => ax.get("/members").then(r => setMembers(r.data)), []);
-  useEffect(() => { fetch(); }, [fetch]);
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState({});
+  const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const updateStatus = async (id, status) => { await ax.put(`/members/${id}/status`, { status }); fetch(); };
+  const fetchMembers = useCallback(() => ax.get("/members").then(r => setMembers(r.data)), []);
+  const fetchSocios = useCallback(async () => {
+    setDvLoading(true);
+    try {
+      const st = await ax.get("/dataverse/status");
+      setDvStatus(st.data);
+      if (st.data.configured) {
+        const r = await ax.get("/dataverse/socios");
+        setSocios(Array.isArray(r.data) ? r.data : []);
+      }
+    } catch { setDvStatus({ configured: false, message: "Erro ao conectar" }); }
+    finally { setDvLoading(false); }
+  }, []);
+  useEffect(() => { fetchMembers(); fetchSocios(); }, [fetchMembers, fetchSocios]);
 
+  const emptyForm = () => ({ cr_numerosocio: "", cr_nome: "", cr_estado: "", cr_datadenascimento: "", cr_telemovel: "", cr_email: "", cr_arruamento: "", cr_nporta: "", cr_codigopostal: "", cr_localidade: "", cr_datadeinscricao: new Date().toISOString().split("T")[0], cr_observacoes: "" });
+  const startNew = () => { setForm(emptyForm()); setEditId(null); setShowForm(true); };
+  const startEdit = (s) => { const f = {}; Object.keys(emptyForm()).forEach(k => { f[k] = s[k] ?? ""; }); setEditId(s[Object.keys(s).find(k => k.endsWith("id") && k.startsWith("cr_"))] || ""); setForm(f); setShowForm(true); };
+  const cancel = () => { setShowForm(false); setEditId(null); };
+  const saveSocio = async () => {
+    setSaving(true);
+    try { if (editId) await ax.put(`/dataverse/socios/${editId}`, form); else await ax.post("/dataverse/socios", form); cancel(); fetchSocios(); }
+    catch (e) { alert(e.response?.data?.detail || "Erro ao guardar"); }
+    finally { setSaving(false); }
+  };
+  const updateMemberStatus = async (id, status) => { await ax.put(`/members/${id}/status`, { status }); fetchMembers(); };
+  const filtered = socios.filter(s => { if (!search) return true; const q = search.toLowerCase(); return (s.cr_nome || "").toLowerCase().includes(q) || (s.cr_email || "").toLowerCase().includes(q) || String(s.cr_numerosocio || "").includes(q); });
   const statusColors = { pending: "bg-yellow-50 text-yellow-700", approved: "bg-green-50 text-[var(--green-700)]", rejected: "bg-red-50 text-red-600" };
   const statusLabels = { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado" };
-
-  const POWERAPPS_URL = "https://apps.powerapps.com/play/e/c87e1463-5eeb-e3c8-8032-5f6e3c326746/a/7b9b82df-3396-4df8-9a25-25cf0ac9cee9?tenantId=14f905ae-d65a-49d7-8cff-54892cba6e7f&source=iframe";
+  const FIELDS = [
+    { key: "cr_numerosocio", label: "Num. Socio" }, { key: "cr_nome", label: "Nome *", w: true }, { key: "cr_estado", label: "Estado" },
+    { key: "cr_datadenascimento", label: "Data Nasc.", type: "date" }, { key: "cr_telemovel", label: "Telemovel" }, { key: "cr_email", label: "Email" },
+    { key: "cr_arruamento", label: "Arruamento", w: true }, { key: "cr_nporta", label: "Num. Porta" }, { key: "cr_codigopostal", label: "Cod. Postal" },
+    { key: "cr_localidade", label: "Localidade" }, { key: "cr_datadeinscricao", label: "Data Inscricao", type: "date" }, { key: "cr_observacoes", label: "Observacoes", w: true, rows: 2 },
+  ];
 
   return (
     <div data-testid="admin-members-tab">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-[var(--text-primary)]">Gestao de Socios</h1>
         <div className="flex gap-2">
-          <button onClick={() => setView("powerapps")}
-            className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${view === "powerapps" ? "bg-[var(--green-700)] text-white" : "border border-[var(--border)] text-[var(--text-muted)]"}`}
-            data-testid="members-view-powerapps">
-            PowerApps
-          </button>
-          <button onClick={() => setView("inscricoes")}
-            className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${view === "inscricoes" ? "bg-[var(--green-700)] text-white" : "border border-[var(--border)] text-[var(--text-muted)]"}`}
-            data-testid="members-view-inscricoes">
-            Inscricoes Website ({members.filter(m => m.status === "pending").length} pendentes)
-          </button>
+          <button onClick={() => setView("dataverse")} data-testid="members-view-dataverse"
+            className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${view === "dataverse" ? "bg-[var(--green-700)] text-white" : "border border-[var(--border)] text-[var(--text-muted)]"}`}>Dataverse</button>
+          <button onClick={() => setView("inscricoes")} data-testid="members-view-inscricoes"
+            className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${view === "inscricoes" ? "bg-[var(--green-700)] text-white" : "border border-[var(--border)] text-[var(--text-muted)]"}`}>Inscricoes ({members.filter(m => m.status === "pending").length})</button>
         </div>
       </div>
-
-      {view === "powerapps" ? (
-        <Card className="overflow-hidden">
-          <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
-            <p className="text-sm font-medium text-[var(--text-primary)]">Microsoft PowerApps — Gestao de Socios</p>
-            <a href={POWERAPPS_URL} target="_blank" rel="noopener noreferrer"
-              className="text-xs font-medium text-[var(--green-700)] hover:underline flex items-center gap-1" data-testid="powerapps-open-new">
-              Abrir em nova janela <ExternalLink size={12} />
-            </a>
+      {view === "dataverse" ? (
+        <div>
+          {dvStatus && !dvStatus.configured && (
+            <Card className="p-4 mb-4 border-l-4 border-l-yellow-400">
+              <p className="text-sm text-yellow-700 font-medium">Dataverse nao configurado</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">{dvStatus.message}</p>
+            </Card>
+          )}
+          <div className="flex items-center gap-3 mb-4">
+            <input type="text" placeholder="Pesquisar nome, email, num. socio..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 px-4 py-2.5 text-sm rounded-lg border border-[var(--border)] outline-none focus:border-[var(--green-700)]" data-testid="members-search" />
+            <Btn onClick={startNew} testId="add-socio-btn" disabled={dvStatus && !dvStatus.configured}><Plus size={14} />Novo Socio</Btn>
           </div>
-          <iframe
-            src={POWERAPPS_URL}
-            title="PowerApps - Gestao de Socios"
-            className="w-full border-0"
-            style={{ height: "calc(100vh - 220px)", minHeight: "500px" }}
-            allow="geolocation; microphone; camera"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-            data-testid="powerapps-iframe"
-          />
-        </Card>
+          {showForm && (
+            <Card className="p-5 mb-5">
+              <h3 className="text-sm font-semibold mb-3">{editId ? "Editar Socio" : "Novo Socio"}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {FIELDS.map(f => (<div key={f.key} className={f.w ? "sm:col-span-3" : ""}><Inp label={f.label} value={form[f.key] ?? ""} onChange={v => setForm({...form, [f.key]: v})} type={f.type || "text"} rows={f.rows} testId={`socio-form-${f.key}`} /></div>))}
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Btn onClick={saveSocio} disabled={saving} testId="socio-form-save"><Save size={14} />{saving ? "..." : "Guardar"}</Btn>
+                <Btn onClick={cancel} variant="secondary"><X size={14} />Cancelar</Btn>
+              </div>
+            </Card>
+          )}
+          {dvLoading ? (
+            <div className="text-center py-16"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin mx-auto" /></div>
+          ) : dvStatus?.configured ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm" data-testid="socios-table">
+                <thead><tr className="border-b border-[var(--border)] text-left">
+                  {["Num.", "Nome", "Estado", "Telemovel", "Email", "Localidade", ""].map(h => (<th key={h} className="py-2.5 px-3 font-semibold text-xs text-[var(--text-muted)]">{h}</th>))}
+                </tr></thead>
+                <tbody>
+                  {filtered.map((s, i) => (
+                    <tr key={i} className="border-b border-[var(--border-light)] hover:bg-[var(--surface-alt)]">
+                      <td className="py-2.5 px-3 font-medium text-[var(--text-primary)]">{s.cr_numerosocio || "-"}</td>
+                      <td className="py-2.5 px-3 text-[var(--text-primary)]">{s.cr_nome || "-"}</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[var(--green-100)] text-[var(--green-700)]">{s.cr_estado || "-"}</span></td>
+                      <td className="py-2.5 px-3 text-[var(--text-muted)]">{s.cr_telemovel || "-"}</td>
+                      <td className="py-2.5 px-3 text-[var(--text-muted)]">{s.cr_email || "-"}</td>
+                      <td className="py-2.5 px-3 text-[var(--text-muted)]">{s.cr_localidade || "-"}</td>
+                      <td className="py-2.5 px-3"><button onClick={() => startEdit(s)} className="p-1 rounded hover:bg-[var(--surface-alt)] text-[var(--green-700)]"><Edit2 size={13} /></button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filtered.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem socios.</p>}
+              <p className="text-xs text-[var(--text-muted)] mt-3">{filtered.length} de {socios.length} socios</p>
+            </div>
+          ) : <p className="text-sm text-[var(--text-muted)] text-center py-10">Configure o Dataverse para ver os socios.</p>}
+        </div>
       ) : (
         <div className="space-y-2">
           {members.map(m => (
-            <Card key={m.id} className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{m.full_name}</p>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${statusColors[m.status] || ""}`}>{statusLabels[m.status] || m.status}</span>
-                  </div>
-                  <p className="text-xs text-[var(--text-muted)]">{m.email} | {m.phone}</p>
-                  {m.address && <p className="text-xs text-[var(--text-muted)]">{m.address}</p>}
-                  {m.message && <p className="text-xs italic text-[var(--text-secondary)] mt-1">"{m.message}"</p>}
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  {m.status !== "approved" && (
-                    <button title="Aprovar" onClick={() => updateStatus(m.id, "approved")} className="p-1.5 rounded hover:bg-green-50 text-[var(--green-700)]"><Check size={14} /></button>
-                  )}
-                  {m.status !== "rejected" && (
-                    <button title="Rejeitar" onClick={() => updateStatus(m.id, "rejected")} className="p-1.5 rounded hover:bg-red-50 text-red-500"><X size={14} /></button>
-                  )}
-                </div>
-              </div>
-            </Card>
+            <Card key={m.id} className="p-4"><div className="flex items-start justify-between gap-3"><div className="flex-1">
+              <div className="flex items-center gap-2 mb-1"><p className="text-sm font-semibold text-[var(--text-primary)]">{m.full_name}</p><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${statusColors[m.status] || ""}`}>{statusLabels[m.status] || m.status}</span></div>
+              <p className="text-xs text-[var(--text-muted)]">{m.email} | {m.phone}</p>
+              {m.address && <p className="text-xs text-[var(--text-muted)]">{m.address}</p>}
+              {m.message && <p className="text-xs italic text-[var(--text-secondary)] mt-1">"{m.message}"</p>}
+            </div><div className="flex gap-1 shrink-0">
+              {m.status !== "approved" && <button title="Aprovar" onClick={() => updateMemberStatus(m.id, "approved")} className="p-1.5 rounded hover:bg-green-50 text-[var(--green-700)]"><Check size={14} /></button>}
+              {m.status !== "rejected" && <button title="Rejeitar" onClick={() => updateMemberStatus(m.id, "rejected")} className="p-1.5 rounded hover:bg-red-50 text-red-500"><X size={14} /></button>}
+            </div></div></Card>
           ))}
           {members.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem inscricoes.</p>}
         </div>

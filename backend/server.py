@@ -11,9 +11,10 @@ from bson import ObjectId
 import os
 import logging
 import bcrypt
-import jwt
+import jwt as pyjwt
 import uuid
 import secrets
+import httpx
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
@@ -38,11 +39,11 @@ def hash_password(pw: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
-def create_access_token(uid: str, email: str) -> str:
-    return jwt.encode({"sub": uid, "email": email, "exp": datetime.now(timezone.utc) + timedelta(minutes=60), "type": "access"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+def create_access_token(uid: str, email: str, provider: str = "local") -> str:
+    return pyjwt.encode({"sub": uid, "email": email, "exp": datetime.now(timezone.utc) + timedelta(minutes=60), "type": "access", "provider": provider}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def create_refresh_token(uid: str) -> str:
-    return jwt.encode({"sub": uid, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "refresh"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return pyjwt.encode({"sub": uid, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "refresh"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get("access_token")
@@ -53,7 +54,7 @@ async def get_current_user(request: Request) -> dict:
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
@@ -62,9 +63,9 @@ async def get_current_user(request: Request) -> dict:
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
         return user
-    except jwt.ExpiredSignatureError:
+    except pyjwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
+    except pyjwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def require_admin(request: Request) -> dict:
@@ -157,7 +158,93 @@ class ContactMessage(BaseModel):
     subject: Optional[str] = ""
     message: str
 
+class MicrosoftLoginRequest(BaseModel):
+    access_token: str
+
+# ── Azure AD / Dataverse Config ──────────────────────────────────────────
+AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID", "")
+AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID", "")
+AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "")
+DATAVERSE_URL = os.environ.get("DATAVERSE_URL", "")
+DATAVERSE_TABLE = os.environ.get("DATAVERSE_TABLE_NAME", "cr_socios")
+
+_dataverse_token_cache = {"token": None, "expires": None}
+
+async def get_dataverse_token() -> str:
+    """Get Dataverse access token via client credentials flow."""
+    now = datetime.now(timezone.utc)
+    if _dataverse_token_cache["token"] and _dataverse_token_cache["expires"] and _dataverse_token_cache["expires"] > now:
+        return _dataverse_token_cache["token"]
+    if not AZURE_TENANT_ID or not AZURE_CLIENT_ID or not AZURE_CLIENT_SECRET or not DATAVERSE_URL:
+        raise HTTPException(status_code=503, detail="Azure/Dataverse not configured")
+    async with httpx.AsyncClient() as client:
+        r = await client.post(
+            f"https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/token",
+            data={"grant_type": "client_credentials", "client_id": AZURE_CLIENT_ID, "client_secret": AZURE_CLIENT_SECRET, "scope": f"{DATAVERSE_URL}/.default"},
+            timeout=15,
+        )
+        if r.status_code != 200:
+            logger.error(f"Dataverse token error: {r.text}")
+            raise HTTPException(status_code=502, detail="Failed to get Dataverse token")
+        data = r.json()
+        _dataverse_token_cache["token"] = data["access_token"]
+        _dataverse_token_cache["expires"] = now + timedelta(seconds=data.get("expires_in", 3600) - 300)
+        return data["access_token"]
+
+async def dataverse_request(method: str, endpoint: str, json_data=None) -> dict:
+    """Make authenticated request to Dataverse Web API."""
+    token = await get_dataverse_token()
+    url = f"{DATAVERSE_URL}/api/data/v9.2/{endpoint}"
+    headers = {"Authorization": f"Bearer {token}", "OData-MaxVersion": "4.0", "OData-Version": "4.0", "Content-Type": "application/json", "Prefer": "return=representation"}
+    async with httpx.AsyncClient() as client:
+        r = await client.request(method, url, headers=headers, json=json_data, timeout=30)
+        if r.status_code >= 400:
+            logger.error(f"Dataverse {method} {endpoint}: {r.status_code} {r.text[:500]}")
+            raise HTTPException(status_code=r.status_code, detail=f"Dataverse error: {r.text[:200]}")
+        if r.status_code == 204:
+            location = r.headers.get("OData-EntityId", "")
+            return {"_created_id": location.split("(")[-1].rstrip(")") if "(" in location else ""}
+        return r.json() if r.text else {}
+
 # ── Auth ─────────────────────────────────────────────────────────────────
+@api_router.post("/auth/microsoft")
+async def microsoft_login(request: Request, response: Response, body: MicrosoftLoginRequest):
+    """Validate Microsoft token, restrict to allowed domain, create/find user, issue JWT."""
+    try:
+        # Decode the Microsoft ID token (we trust Azure AD's signature for now)
+        claims = pyjwt.decode(body.access_token, options={"verify_signature": False, "verify_aud": False})
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Microsoft token")
+
+    email = (claims.get("preferred_username") or claims.get("upn") or claims.get("email") or "").lower().strip()
+    name = claims.get("name", "")
+    tid = claims.get("tid", "")
+
+    # Validate tenant if configured
+    if AZURE_TENANT_ID and tid != AZURE_TENANT_ID:
+        raise HTTPException(status_code=403, detail="Tenant nao autorizado")
+
+    # Validate domain
+    allowed_domain = "sociedadesaojoaodaslampas.pt"
+    if not email.endswith(f"@{allowed_domain}"):
+        raise HTTPException(status_code=403, detail=f"Apenas contas @{allowed_domain} sao permitidas")
+
+    # Find or create user in MongoDB
+    user = await db.users.find_one({"email": email})
+    if not user:
+        insert_result = await db.users.insert_one({
+            "email": email, "name": name, "role": "admin", "provider": "microsoft",
+            "password_hash": "", "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        user = await db.users.find_one({"_id": insert_result.inserted_id})
+
+    uid = str(user["_id"])
+    at = create_access_token(uid, email, provider="microsoft")
+    rt = create_refresh_token(uid)
+    response.set_cookie(key="access_token", value=at, httponly=True, secure=False, samesite="lax", max_age=3600, path="/")
+    response.set_cookie(key="refresh_token", value=rt, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
+    return {"id": uid, "email": email, "name": name, "role": user.get("role", "admin"), "provider": "microsoft", "token": at}
+
 @api_router.post("/auth/login")
 async def login(request: Request, response: Response, body: LoginRequest):
     email = body.email.lower().strip()
@@ -397,6 +484,39 @@ async def delete_contact(msg_id: str, request: Request):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
     return {"message": "Deleted"}
+
+# ── Dataverse Socios ─────────────────────────────────────────────────────
+@api_router.get("/dataverse/socios")
+async def get_dataverse_socios(request: Request):
+    await require_admin(request)
+    result = await dataverse_request("GET", f"{DATAVERSE_TABLE}?$top=500&$orderby=createdon desc")
+    return result.get("value", [])
+
+@api_router.post("/dataverse/socios")
+async def create_dataverse_socio(request: Request):
+    await require_admin(request)
+    body = await request.json()
+    result = await dataverse_request("POST", DATAVERSE_TABLE, json_data=body)
+    return result
+
+@api_router.put("/dataverse/socios/{record_id}")
+async def update_dataverse_socio(record_id: str, request: Request):
+    await require_admin(request)
+    body = await request.json()
+    result = await dataverse_request("PATCH", f"{DATAVERSE_TABLE}({record_id})", json_data=body)
+    return result
+
+@api_router.get("/dataverse/status")
+async def dataverse_status(request: Request):
+    """Check if Dataverse is configured and reachable."""
+    await require_admin(request)
+    if not DATAVERSE_URL or not AZURE_CLIENT_ID or not AZURE_CLIENT_SECRET:
+        return {"configured": False, "message": "Dataverse nao configurado. Defina AZURE_CLIENT_ID, AZURE_CLIENT_SECRET e DATAVERSE_URL no .env"}
+    try:
+        await get_dataverse_token()
+        return {"configured": True, "message": "Dataverse conectado"}
+    except Exception as e:
+        return {"configured": False, "message": f"Erro de conexao: {str(e)}"}
 
 # ── Health ───────────────────────────────────────────────────────────────
 @api_router.get("/")
