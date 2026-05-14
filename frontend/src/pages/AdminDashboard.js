@@ -1,193 +1,325 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import {
   LogOut, LayoutDashboard, Calendar, Briefcase, Clock as ClockIcon, Mail, Settings, Users,
-  Plus, Trash2, Edit2, Save, X, Check, Eye, Reply, ExternalLink, ArrowUp, ArrowDown,
-  TrendingUp, MessageSquare, UserPlus, CalendarDays,
+  Plus, Trash2, Edit2, Save, X, Check, Eye, Reply, ExternalLink, Search,
+  TrendingUp, MessageSquare, UserPlus, CalendarDays, ChevronRight, Bell, Home,
 } from "lucide-react";
 import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const ax = axios.create({ baseURL: API, withCredentials: true });
+const LOGO = "https://customer-assets.emergentagent.com/job_sao-joao-lampas/artifacts/31zt6imn_minilogo-transparente.png";
 
 export default function AdminDashboard() {
   const { user, loading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState("dashboard");
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "admin")) navigate("/admin/login");
   }, [user, authLoading, navigate]);
 
-  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin" /></div>;
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  if (authLoading) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0B3D2E 0%, #0d6b4f 100%)" }}>
+      <div className="w-10 h-10 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+    </div>
+  );
   if (!user || user.role !== "admin") return null;
 
   const TABS = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "homepage", label: "Homepage", icon: TrendingUp },
+    { id: "homepage", label: "Homepage", icon: Home },
     { id: "events", label: "Eventos", icon: Calendar },
     { id: "services", label: "Servicos", icon: Briefcase },
     { id: "timeline", label: "Cronologia", icon: ClockIcon },
-    { id: "messages", label: "Mensagens", icon: Mail },
+    { id: "messages", label: "Mensagens", icon: Mail, badge: true },
     { id: "members", label: "Socios", icon: Users },
     { id: "settings", label: "Definicoes", icon: Settings },
   ];
 
   return (
-    <div className="min-h-screen flex bg-[var(--bg)]">
-      <aside className="w-56 min-h-screen flex flex-col border-r border-[var(--border)] bg-white" data-testid="admin-sidebar">
-        <div className="p-4 border-b border-[var(--border)]">
-          <h2 className="text-sm font-bold text-[var(--text-primary)]">Admin SRDFSJL</h2>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">{user.email}</p>
+    <div className="min-h-screen flex">
+      {/* Sidebar */}
+      <aside className="w-[240px] min-h-screen flex flex-col" style={{ background: "linear-gradient(180deg, #0B3D2E 0%, #0a5640 100%)" }} data-testid="admin-sidebar">
+        <div className="px-5 py-6 flex items-center gap-3">
+          <img src={LOGO} alt="SRDFSJL" className="w-9 h-9 object-contain" />
+          <div>
+            <p className="text-white text-sm font-bold tracking-tight">SRDFSJL</p>
+            <p className="text-white/40 text-[10px]">Backoffice</p>
+          </div>
         </div>
-        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+
+        <nav className="flex-1 px-3 space-y-1">
+          <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest px-3 mb-2 mt-2">Menu</p>
           {TABS.map(t => (
             <button key={t.id} data-testid={`admin-tab-${t.id}`} onClick={() => setTab(t.id)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium rounded-lg transition-colors ${tab === t.id ? "bg-[var(--green-700)] text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"}`}>
-              <t.icon size={15} />{t.label}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-xl transition-all duration-200 group ${
+                tab === t.id
+                  ? "bg-white/15 text-white shadow-lg shadow-black/10"
+                  : "text-white/50 hover:text-white/80 hover:bg-white/5"
+              }`}>
+              <t.icon size={16} className={tab === t.id ? "text-[#15B377]" : "text-white/40 group-hover:text-white/60"} />
+              <span className="flex-1 text-left">{t.label}</span>
+              {tab === t.id && <ChevronRight size={12} className="text-white/40" />}
             </button>
           ))}
         </nav>
-        <div className="p-2 border-t border-[var(--border)]">
-          <button data-testid="admin-logout-btn" onClick={async () => { await logout(); navigate("/admin/login"); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-[var(--text-muted)] rounded-lg hover:bg-[var(--surface-alt)]">
-            <LogOut size={15} />Sair
-          </button>
+
+        <div className="px-3 pb-3">
+          <div className="px-3 py-3 rounded-xl bg-white/5 mb-3">
+            <p className="text-[11px] text-white/70 font-medium truncate">{user.name || user.email}</p>
+            <p className="text-[10px] text-white/30 truncate">{user.email}</p>
+          </div>
+          <div className="flex gap-2">
+            <Link to="/" className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-medium text-white/40 rounded-lg hover:bg-white/5 hover:text-white/70 transition-all">
+              <Home size={12} />Ver Site
+            </Link>
+            <button data-testid="admin-logout-btn" onClick={async () => { await logout(); navigate("/admin/login"); }}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-medium text-white/40 rounded-lg hover:bg-red-500/20 hover:text-red-300 transition-all">
+              <LogOut size={12} />Sair
+            </button>
+          </div>
         </div>
       </aside>
-      <main className="flex-1 p-6 overflow-y-auto max-h-screen">
-        {tab === "dashboard" && <DashboardTab />}
-        {tab === "homepage" && <HomepageTab />}
-        {tab === "events" && <EventsTab />}
-        {tab === "services" && <ServicesTab />}
-        {tab === "timeline" && <TimelineTab />}
-        {tab === "messages" && <MessagesTab />}
-        {tab === "members" && <MembersTab />}
-        {tab === "settings" && <SettingsTab />}
-      </main>
+
+      {/* Main */}
+      <div className="flex-1 flex flex-col min-h-screen bg-[#F5F6F8]">
+        {/* Top bar */}
+        <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-8 flex-shrink-0">
+          <h1 className="text-lg font-bold text-gray-800">{TABS.find(t => t.id === tab)?.label || "Dashboard"}</h1>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[var(--green-100)] flex items-center justify-center text-[var(--green-700)]">
+              <Bell size={14} />
+            </div>
+            <div className="w-8 h-8 rounded-full bg-[var(--green-700)] flex items-center justify-center text-white text-xs font-bold">
+              {(user.name || user.email || "A")[0].toUpperCase()}
+            </div>
+          </div>
+        </header>
+
+        {/* Content */}
+        <main className="flex-1 p-8 overflow-y-auto">
+          {tab === "dashboard" && <DashboardTab onNav={setTab} />}
+          {tab === "homepage" && <HomepageTab showToast={showToast} />}
+          {tab === "events" && <EventsTab showToast={showToast} />}
+          {tab === "services" && <ServicesTab showToast={showToast} />}
+          {tab === "timeline" && <TimelineTab showToast={showToast} />}
+          {tab === "messages" && <MessagesTab showToast={showToast} />}
+          {tab === "members" && <MembersTab showToast={showToast} />}
+          {tab === "settings" && <SettingsTab showToast={showToast} />}
+        </main>
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-medium flex items-center gap-2 anim-fade-up ${
+          toast.type === "success" ? "bg-[var(--green-700)] text-white" : "bg-red-500 text-white"
+        }`}>
+          {toast.type === "success" ? <Check size={16} /> : <X size={16} />}
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Shared ─────────────────────────────────────────────────────────────
+// ── Shared Components ──────────────────────────────────────────────────
 const Inp = ({ label, value, onChange, type = "text", placeholder = "", testId, rows }) => (
   <div>
-    <label className="block text-xs font-medium text-[var(--text-primary)] mb-1">{label}</label>
+    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{label}</label>
     {rows ? (
       <textarea data-testid={testId} rows={rows} value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] outline-none resize-none focus:border-[var(--green-700)]" placeholder={placeholder} />
+        className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50/50 outline-none resize-none focus:border-[var(--green-700)] focus:bg-white focus:ring-2 focus:ring-[var(--green-700)]/10 transition-all" placeholder={placeholder} />
     ) : (
       <input data-testid={testId} type={type} value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] outline-none focus:border-[var(--green-700)]" placeholder={placeholder} />
+        className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50/50 outline-none focus:border-[var(--green-700)] focus:bg-white focus:ring-2 focus:ring-[var(--green-700)]/10 transition-all" placeholder={placeholder} />
     )}
   </div>
 );
 
 const Btn = ({ children, onClick, variant = "primary", disabled, testId, className = "" }) => {
-  const base = "inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-all disabled:opacity-50";
-  const styles = { primary: "bg-[var(--green-700)] text-white hover:brightness-110", secondary: "border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]", danger: "bg-red-500 text-white hover:bg-red-600" };
+  const base = "inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed";
+  const styles = {
+    primary: "bg-[var(--green-700)] text-white hover:bg-[var(--green-900)] shadow-sm hover:shadow-md",
+    secondary: "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm",
+    danger: "bg-red-500 text-white hover:bg-red-600 shadow-sm",
+  };
   return <button data-testid={testId} onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]} ${className}`}>{children}</button>;
 };
 
-const Card = ({ children, className = "" }) => <div className={`bg-white rounded-xl border border-[var(--border)] ${className}`}>{children}</div>;
+const Card = ({ children, className = "" }) => <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm ${className}`}>{children}</div>;
 
 // ── Dashboard ─────────────────────────────────────────────────────────
-function DashboardTab() {
+function DashboardTab({ onNav }) {
   const [s, setS] = useState(null);
-  useEffect(() => { ax.get("/admin/stats").then(r => setS(r.data)); }, []);
-  if (!s) return <div className="animate-pulse text-sm text-[var(--text-muted)]">A carregar...</div>;
+  const [recentMsgs, setRecentMsgs] = useState([]);
+  const [recentEvents, setRecentEvents] = useState([]);
+
+  useEffect(() => {
+    ax.get("/admin/stats").then(r => setS(r.data));
+    ax.get("/contacts").then(r => setRecentMsgs(r.data.slice(0, 4))).catch(() => {});
+    ax.get("/events/upcoming").then(r => setRecentEvents(r.data.slice(0, 3))).catch(() => {});
+  }, []);
+
+  if (!s) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin" /></div>;
+
   const cards = [
-    { label: "Eventos Futuros", val: s.events.upcoming, total: s.events.total, icon: CalendarDays, color: "var(--green-700)" },
-    { label: "Mensagens Nao Lidas", val: s.messages.unread, total: s.messages.total, icon: MessageSquare, color: "#D97742" },
-    { label: "Socios Pendentes", val: s.members.pending, total: s.members.total, icon: UserPlus, color: "#6366f1" },
-    { label: "Servicos Ativos", val: s.services.total, total: null, icon: Briefcase, color: "#0891b2" },
+    { label: "Eventos Futuros", val: s.events.upcoming, sub: `${s.events.total} total`, icon: CalendarDays, color: "#0d6b4f", bg: "#E6F5EF" },
+    { label: "Mensagens", val: s.messages.unread, sub: `${s.messages.unread} nao lidas`, icon: MessageSquare, color: "#D97742", bg: "#FEF3E8" },
+    { label: "Socios Pendentes", val: s.members.pending, sub: `${s.members.total} total`, icon: UserPlus, color: "#6366f1", bg: "#EEF2FF" },
+    { label: "Servicos", val: s.services.total, sub: "ativos", icon: Briefcase, color: "#0891b2", bg: "#E8FAFE" },
   ];
+
   return (
-    <div data-testid="admin-dashboard-tab">
-      <h1 className="text-xl font-bold text-[var(--text-primary)] mb-6">Dashboard</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div data-testid="admin-dashboard-tab" className="space-y-8">
+      {/* Welcome */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Bem-vindo ao Backoffice</h2>
+          <p className="text-sm text-gray-400 mt-1">Aqui tem uma visao geral do seu website.</p>
+        </div>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {cards.map(c => (
-          <Card key={c.label} className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-2xl font-bold" style={{ color: c.color }}>{c.val}</p>
-                <p className="text-xs text-[var(--text-muted)] mt-1">{c.label}</p>
-                {c.total !== null && <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{c.total} total</p>}
-              </div>
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: c.color + "15" }}>
-                <c.icon size={18} style={{ color: c.color }} />
+          <Card key={c.label} className="p-6 hover:shadow-md transition-shadow cursor-default">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: c.bg }}>
+                <c.icon size={22} style={{ color: c.color }} />
               </div>
             </div>
+            <p className="text-3xl font-bold text-gray-800">{c.val}</p>
+            <p className="text-sm text-gray-400 mt-1">{c.label}</p>
+            <p className="text-[11px] text-gray-300 mt-0.5">{c.sub}</p>
           </Card>
         ))}
+      </div>
+
+      {/* Quick sections */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Recent messages */}
+        <Card className="p-0 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-gray-700">Mensagens Recentes</h3>
+            <button onClick={() => onNav("messages")} className="text-xs font-medium text-[var(--green-700)] hover:underline">Ver todas</button>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {recentMsgs.length > 0 ? recentMsgs.map(m => (
+              <div key={m.id} className="px-6 py-3.5 flex items-center gap-3 hover:bg-gray-50/50 transition-colors">
+                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 shrink-0">
+                  {(m.name || "?")[0].toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-700 truncate">{m.name}</p>
+                  <p className="text-xs text-gray-400 truncate">{m.message}</p>
+                </div>
+                {!m.read && <div className="w-2 h-2 rounded-full bg-[var(--green-500)] shrink-0" />}
+              </div>
+            )) : <p className="px-6 py-8 text-sm text-gray-300 text-center">Sem mensagens.</p>}
+          </div>
+        </Card>
+
+        {/* Upcoming events */}
+        <Card className="p-0 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-gray-700">Proximos Eventos</h3>
+            <button onClick={() => onNav("events")} className="text-xs font-medium text-[var(--green-700)] hover:underline">Ver todos</button>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {recentEvents.length > 0 ? recentEvents.map(ev => {
+              const d = new Date(ev.date + "T00:00:00");
+              const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+              return (
+                <div key={ev.id} className="px-6 py-3.5 flex items-center gap-4 hover:bg-gray-50/50 transition-colors">
+                  <div className="w-12 h-12 rounded-xl bg-[var(--green-100)] flex flex-col items-center justify-center shrink-0">
+                    <span className="text-base font-bold text-[var(--green-700)] leading-none">{d.getDate()}</span>
+                    <span className="text-[9px] font-semibold text-[var(--green-700)] uppercase">{months[d.getMonth()]}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-700 truncate">{ev.title}</p>
+                    <p className="text-xs text-gray-400">{ev.time} {ev.location && `· ${ev.location}`}</p>
+                  </div>
+                  {ev.price && <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 shrink-0">{ev.price}</span>}
+                </div>
+              );
+            }) : <p className="px-6 py-8 text-sm text-gray-300 text-center">Sem eventos futuros.</p>}
+          </div>
+        </Card>
       </div>
     </div>
   );
 }
 
 // ── Homepage Content ──────────────────────────────────────────────────
-function HomepageTab() {
+function HomepageTab({ showToast }) {
   const [data, setData] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
 
   useEffect(() => { ax.get("/content/homepage").then(r => setData(r.data)); }, []);
 
   const save = async () => {
-    setSaving(true); setMsg("");
-    try { await ax.put("/content/homepage", data); setMsg("Guardado!"); setTimeout(() => setMsg(""), 2000); }
-    catch { setMsg("Erro ao guardar"); }
+    setSaving(true);
+    try { await ax.put("/content/homepage", data); showToast("Homepage guardada!"); }
+    catch { showToast("Erro ao guardar", "error"); }
     finally { setSaving(false); }
   };
 
-  if (!data) return <div className="animate-pulse text-sm text-[var(--text-muted)]">A carregar...</div>;
+  if (!data) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div data-testid="admin-homepage-tab">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Conteudo da Homepage</h1>
-        <div className="flex items-center gap-3">
-          {msg && <span className="text-sm text-[var(--green-700)] font-medium">{msg}</span>}
-          <Btn onClick={save} disabled={saving} testId="save-homepage"><Save size={14} />{saving ? "A guardar..." : "Guardar"}</Btn>
-        </div>
+    <div data-testid="admin-homepage-tab" className="space-y-6 max-w-4xl">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-400">Edite o conteudo visivel na pagina inicial.</p>
+        <Btn onClick={save} disabled={saving} testId="save-homepage"><Save size={14} />{saving ? "A guardar..." : "Guardar Alteracoes"}</Btn>
       </div>
-      <div className="space-y-6">
-        <Card className="p-6">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Hero Section</h3>
-          <div className="space-y-3">
-            <Inp label="Badge (tag superior)" value={data.hero_badge || ""} onChange={v => setData({...data, hero_badge: v})} placeholder="Desde 1911..." />
-            <Inp label="Titulo Principal" value={data.hero_title || ""} onChange={v => setData({...data, hero_title: v})} />
-            <Inp label="Subtitulo" value={data.hero_subtitle || ""} onChange={v => setData({...data, hero_subtitle: v})} rows={2} />
-          </div>
-        </Card>
-        <Card className="p-6">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Seccao Sobre Nos</h3>
-          <div className="space-y-3">
+
+      <Card className="p-7">
+        <h3 className="text-sm font-bold text-gray-700 mb-5 flex items-center gap-2"><Home size={15} className="text-[var(--green-700)]" /> Hero Section</h3>
+        <div className="space-y-4">
+          <Inp label="Badge" value={data.hero_badge || ""} onChange={v => setData({...data, hero_badge: v})} placeholder="Desde 1911..." />
+          <Inp label="Titulo Principal" value={data.hero_title || ""} onChange={v => setData({...data, hero_title: v})} />
+          <Inp label="Subtitulo" value={data.hero_subtitle || ""} onChange={v => setData({...data, hero_subtitle: v})} rows={2} />
+        </div>
+      </Card>
+
+      <Card className="p-7">
+        <h3 className="text-sm font-bold text-gray-700 mb-5 flex items-center gap-2"><TrendingUp size={15} className="text-[var(--green-700)]" /> Seccao Sobre Nos</h3>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             <Inp label="Label" value={data.about_label || ""} onChange={v => setData({...data, about_label: v})} />
             <Inp label="Titulo" value={data.about_title || ""} onChange={v => setData({...data, about_title: v})} />
-            <Inp label="Texto" value={data.about_text || ""} onChange={v => setData({...data, about_text: v})} rows={3} />
           </div>
-        </Card>
-        <Card className="p-6">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Estatisticas</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {(data.stats || []).map((s, i) => (
-              <div key={i} className="p-3 border border-[var(--border)] rounded-lg space-y-2">
-                <Inp label="Valor" type="number" value={s.val} onChange={v => { const ns = [...data.stats]; ns[i] = {...ns[i], val: parseInt(v) || 0}; setData({...data, stats: ns}); }} />
-                <Inp label="Label" value={s.label} onChange={v => { const ns = [...data.stats]; ns[i] = {...ns[i], label: v}; setData({...data, stats: ns}); }} />
-                <Inp label="Sufixo" value={s.suffix} onChange={v => { const ns = [...data.stats]; ns[i] = {...ns[i], suffix: v}; setData({...data, stats: ns}); }} placeholder="ex: +" />
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
+          <Inp label="Texto" value={data.about_text || ""} onChange={v => setData({...data, about_text: v})} rows={3} />
+        </div>
+      </Card>
+
+      <Card className="p-7">
+        <h3 className="text-sm font-bold text-gray-700 mb-5">Estatisticas</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {(data.stats || []).map((s, i) => (
+            <div key={i} className="p-4 rounded-xl bg-gray-50 space-y-3">
+              <Inp label="Valor" type="number" value={s.val} onChange={v => { const ns = [...data.stats]; ns[i] = {...ns[i], val: parseInt(v) || 0}; setData({...data, stats: ns}); }} />
+              <Inp label="Label" value={s.label} onChange={v => { const ns = [...data.stats]; ns[i] = {...ns[i], label: v}; setData({...data, stats: ns}); }} />
+              <Inp label="Sufixo" value={s.suffix} onChange={v => { const ns = [...data.stats]; ns[i] = {...ns[i], suffix: v}; setData({...data, stats: ns}); }} placeholder="+" />
+            </div>
+          ))}
+        </div>
+      </Card>
     </div>
   );
 }
 
-// ── CRUD Tab (generic for Events, Services, Timeline) ─────────────────
-function CRUDTab({ title, endpoint, fields, testPrefix }) {
+// ── Generic CRUD Tab ──────────────────────────────────────────────────
+function CRUDTab({ title, subtitle, endpoint, fields, testPrefix, showToast }) {
   const [items, setItems] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -197,32 +329,36 @@ function CRUDTab({ title, endpoint, fields, testPrefix }) {
   useEffect(() => { fetch(); }, [fetch]);
 
   const emptyForm = () => fields.reduce((a, f) => ({ ...a, [f.key]: f.default || "" }), {});
-
   const startNew = () => { setForm(emptyForm()); setEditId(null); setShowForm(true); };
   const startEdit = (item) => { setForm(fields.reduce((a, f) => ({ ...a, [f.key]: item[f.key] ?? f.default ?? "" }), {})); setEditId(item.id); setShowForm(true); };
   const cancel = () => { setShowForm(false); setEditId(null); };
 
   const save = async () => {
-    if (editId) await ax.put(`${endpoint}/${editId}`, form);
-    else await ax.post(endpoint, form);
-    cancel(); fetch();
+    try {
+      if (editId) await ax.put(`${endpoint}/${editId}`, form);
+      else await ax.post(endpoint, form);
+      cancel(); fetch();
+      showToast(editId ? "Atualizado!" : "Criado com sucesso!");
+    } catch (e) { showToast(e.response?.data?.detail || "Erro", "error"); }
   };
 
   const remove = async (id) => {
-    if (window.confirm("Tem a certeza?")) { await ax.delete(`${endpoint}/${id}`); fetch(); }
+    if (window.confirm("Tem a certeza?")) { await ax.delete(`${endpoint}/${id}`); fetch(); showToast("Eliminado."); }
   };
 
   return (
     <div data-testid={`admin-${testPrefix}-tab`}>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">{title}</h1>
-        <Btn onClick={startNew} testId={`add-${testPrefix}-btn`}><Plus size={14} />Novo</Btn>
+        <div>
+          <p className="text-sm text-gray-400">{subtitle}</p>
+        </div>
+        <Btn onClick={startNew} testId={`add-${testPrefix}-btn`}><Plus size={15} />Adicionar</Btn>
       </div>
 
       {showForm && (
-        <Card className="p-5 mb-5">
-          <h3 className="text-sm font-semibold mb-3">{editId ? "Editar" : "Novo"}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Card className="p-6 mb-6">
+          <h3 className="text-sm font-bold text-gray-700 mb-4">{editId ? "Editar" : "Novo"}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {fields.map(f => (
               <div key={f.key} className={f.wide ? "sm:col-span-2" : ""}>
                 <Inp label={f.label} value={form[f.key] ?? ""} onChange={v => setForm({...form, [f.key]: f.type === "number" ? (parseInt(v) || 0) : v})}
@@ -230,121 +366,122 @@ function CRUDTab({ title, endpoint, fields, testPrefix }) {
               </div>
             ))}
           </div>
-          <div className="flex gap-2 mt-4">
+          <div className="flex gap-3 mt-5">
             <Btn onClick={save} testId={`${testPrefix}-form-save`}><Save size={14} />Guardar</Btn>
             <Btn onClick={cancel} variant="secondary"><X size={14} />Cancelar</Btn>
           </div>
         </Card>
       )}
 
-      <div className="space-y-2">
-        {items.map(item => (
-          <Card key={item.id} className="px-4 py-3 flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-[var(--text-primary)] truncate">{item[fields[0].key]}</p>
-              <p className="text-xs text-[var(--text-muted)] truncate">{item[fields[1]?.key] || ""} {item.date ? `| ${item.date}` : ""}</p>
+      <Card className="overflow-hidden">
+        <div className="divide-y divide-gray-50">
+          {items.map(item => (
+            <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors group">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-700">{item[fields[0].key]}</p>
+                <p className="text-xs text-gray-400 truncate mt-0.5">
+                  {item[fields[1]?.key] || ""} {item.date ? `· ${item.date}` : ""} {item.time ? `· ${item.time}` : ""}
+                </p>
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => startEdit(item)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--green-100)] text-[var(--green-700)] transition-colors" data-testid={`edit-${testPrefix}-${item.id}`}><Edit2 size={14} /></button>
+                <button onClick={() => remove(item.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 text-red-400 transition-colors" data-testid={`delete-${testPrefix}-${item.id}`}><Trash2 size={14} /></button>
+              </div>
             </div>
-            <div className="flex gap-1 shrink-0">
-              <button onClick={() => startEdit(item)} className="p-1.5 rounded hover:bg-[var(--surface-alt)] text-[var(--green-700)]" data-testid={`edit-${testPrefix}-${item.id}`}><Edit2 size={14} /></button>
-              <button onClick={() => remove(item.id)} className="p-1.5 rounded hover:bg-red-50 text-red-500" data-testid={`delete-${testPrefix}-${item.id}`}><Trash2 size={14} /></button>
-            </div>
-          </Card>
-        ))}
-        {items.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem registos.</p>}
-      </div>
+          ))}
+          {items.length === 0 && <p className="text-sm text-gray-300 text-center py-12">Sem registos. Clique em "Adicionar" para comecar.</p>}
+        </div>
+      </Card>
     </div>
   );
 }
 
-function EventsTab() {
-  return <CRUDTab title="Gerir Eventos" endpoint="/events" testPrefix="event" fields={[
-    { key: "title", label: "Titulo *", wide: false },
-    { key: "date", label: "Data *", type: "date" },
-    { key: "time", label: "Hora", placeholder: "ex: 21:00" },
-    { key: "location", label: "Local" },
-    { key: "price", label: "Preco", placeholder: "ex: 12 euros" },
-    { key: "image_url", label: "URL Imagem" },
+function EventsTab({ showToast }) {
+  return <CRUDTab title="Eventos" subtitle="Gerir os eventos da sociedade." endpoint="/events" testPrefix="event" showToast={showToast} fields={[
+    { key: "title", label: "Titulo *" }, { key: "date", label: "Data *", type: "date" },
+    { key: "time", label: "Hora", placeholder: "21:00" }, { key: "location", label: "Local" },
+    { key: "price", label: "Preco", placeholder: "12 euros" }, { key: "image_url", label: "URL Imagem" },
     { key: "description", label: "Descricao *", wide: true, rows: 3 },
   ]} />;
 }
 
-function ServicesTab() {
-  return <CRUDTab title="Gerir Servicos" endpoint="/services" testPrefix="service" fields={[
-    { key: "title", label: "Titulo *" },
-    { key: "tag", label: "Categoria *", placeholder: "ex: Cultura, Desporto" },
-    { key: "image_url", label: "URL Imagem", wide: true },
-    { key: "note", label: "Nota / Destaque" },
+function ServicesTab({ showToast }) {
+  return <CRUDTab title="Servicos" subtitle="Gerir os servicos oferecidos." endpoint="/services" testPrefix="service" showToast={showToast} fields={[
+    { key: "title", label: "Titulo *" }, { key: "tag", label: "Categoria *", placeholder: "Cultura, Desporto..." },
+    { key: "image_url", label: "URL Imagem", wide: true }, { key: "note", label: "Destaque" },
     { key: "order", label: "Ordem", type: "number", default: 0 },
     { key: "description", label: "Descricao *", wide: true, rows: 3 },
   ]} />;
 }
 
-function TimelineTab() {
-  return <CRUDTab title="Gerir Cronologia" endpoint="/timeline" testPrefix="timeline" fields={[
-    { key: "year", label: "Ano *", placeholder: "ex: 1911, 1950s" },
-    { key: "title", label: "Titulo *" },
+function TimelineTab({ showToast }) {
+  return <CRUDTab title="Cronologia" subtitle="Gerir a cronologia historica." endpoint="/timeline" testPrefix="timeline" showToast={showToast} fields={[
+    { key: "year", label: "Ano *", placeholder: "1911, 1950s..." }, { key: "title", label: "Titulo *" },
     { key: "order", label: "Ordem", type: "number", default: 0 },
     { key: "description", label: "Descricao *", wide: true, rows: 3 },
   ]} />;
 }
 
 // ── Messages ──────────────────────────────────────────────────────────
-function MessagesTab() {
+function MessagesTab({ showToast }) {
   const [msgs, setMsgs] = useState([]);
   const [filter, setFilter] = useState("all");
   const fetch = useCallback(() => ax.get("/contacts").then(r => setMsgs(r.data)), []);
   useEffect(() => { fetch(); }, [fetch]);
 
   const shown = filter === "unread" ? msgs.filter(m => !m.read) : filter === "replied" ? msgs.filter(m => m.replied) : msgs;
-
-  const toggle = async (id, field, val) => { await ax.put(`/contacts/${id}`, { [field]: val }); fetch(); };
-  const remove = async (id) => { if (window.confirm("Apagar mensagem?")) { await ax.delete(`/contacts/${id}`); fetch(); } };
+  const toggle = async (id, field, val) => { await ax.put(`/contacts/${id}`, { [field]: val }); fetch(); showToast("Atualizado!"); };
+  const remove = async (id) => { if (window.confirm("Apagar?")) { await ax.delete(`/contacts/${id}`); fetch(); showToast("Apagada."); } };
 
   return (
     <div data-testid="admin-messages-tab">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Mensagens ({msgs.filter(m => !m.read).length} nao lidas)</h1>
+        <p className="text-sm text-gray-400">{msgs.filter(m => !m.read).length} mensagens nao lidas</p>
         <div className="flex gap-2">
-          {["all", "unread", "replied"].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg ${filter === f ? "bg-[var(--green-700)] text-white" : "border border-[var(--border)] text-[var(--text-muted)]"}`}>
-              {f === "all" ? "Todas" : f === "unread" ? "Nao lidas" : "Respondidas"}
-            </button>
+          {[{ v: "all", l: "Todas" }, { v: "unread", l: "Nao lidas" }, { v: "replied", l: "Respondidas" }].map(f => (
+            <button key={f.v} onClick={() => setFilter(f.v)}
+              className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${filter === f.v ? "bg-[var(--green-700)] text-white shadow-sm" : "bg-white border border-gray-200 text-gray-400 hover:text-gray-600"}`}>{f.l}</button>
           ))}
         </div>
       </div>
-      <div className="space-y-2">
-        {shown.map(m => (
-          <Card key={m.id} className={`p-4 ${!m.read ? "border-l-4 border-l-[var(--green-700)]" : ""}`}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{m.name}</p>
-                  <span className="text-[10px] text-[var(--text-muted)]">{m.email}</span>
-                  {!m.read && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--green-100)] text-[var(--green-700)]">NOVA</span>}
-                  {m.replied && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">RESPONDIDA</span>}
+
+      <Card className="overflow-hidden">
+        <div className="divide-y divide-gray-50">
+          {shown.map(m => (
+            <div key={m.id} className={`px-6 py-5 hover:bg-gray-50/50 transition-colors ${!m.read ? "bg-[var(--green-100)]/30" : ""}`}>
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0" style={{ backgroundColor: !m.read ? "var(--green-100)" : "#f3f4f6", color: !m.read ? "var(--green-700)" : "#9ca3af" }}>
+                  {(m.name || "?")[0].toUpperCase()}
                 </div>
-                {m.subject && <p className="text-xs font-medium text-[var(--text-primary)] mb-1">{m.subject}</p>}
-                <p className="text-sm text-[var(--text-secondary)]">{m.message}</p>
-                <p className="text-[10px] text-[var(--text-muted)] mt-2">{m.created_at ? new Date(m.created_at).toLocaleString("pt-PT") : ""}</p>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                {!m.read && <button title="Marcar como lida" onClick={() => toggle(m.id, "read", true)} className="p-1.5 rounded hover:bg-[var(--surface-alt)] text-[var(--green-700)]"><Eye size={14} /></button>}
-                {!m.replied && <button title="Marcar como respondida" onClick={() => toggle(m.id, "replied", true)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600"><Reply size={14} /></button>}
-                <a href={`mailto:${m.email}?subject=Re: ${m.subject || "Contacto SRDFSJL"}`} title="Responder por email" className="p-1.5 rounded hover:bg-[var(--surface-alt)] text-[var(--text-muted)]"><ExternalLink size={14} /></a>
-                <button onClick={() => remove(m.id)} className="p-1.5 rounded hover:bg-red-50 text-red-500"><Trash2 size={14} /></button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-sm font-semibold text-gray-700">{m.name}</p>
+                    <span className="text-[10px] text-gray-300">{m.email}</span>
+                    {!m.read && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[var(--green-100)] text-[var(--green-700)]">NOVA</span>}
+                    {m.replied && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-500">RESPONDIDA</span>}
+                  </div>
+                  {m.subject && <p className="text-xs font-medium text-gray-600 mb-1">{m.subject}</p>}
+                  <p className="text-sm text-gray-500 leading-relaxed">{m.message}</p>
+                  <p className="text-[10px] text-gray-300 mt-2">{m.created_at ? new Date(m.created_at).toLocaleString("pt-PT") : ""}</p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  {!m.read && <button title="Marcar lida" onClick={() => toggle(m.id, "read", true)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--green-100)] text-[var(--green-700)]"><Eye size={14} /></button>}
+                  {!m.replied && <button title="Respondida" onClick={() => toggle(m.id, "replied", true)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 text-blue-500"><Reply size={14} /></button>}
+                  <a href={`mailto:${m.email}?subject=Re: ${m.subject || "Contacto SRDFSJL"}`} title="Email" className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 text-gray-400"><ExternalLink size={14} /></a>
+                  <button onClick={() => remove(m.id)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 text-red-400"><Trash2 size={14} /></button>
+                </div>
               </div>
             </div>
-          </Card>
-        ))}
-        {shown.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem mensagens.</p>}
-      </div>
+          ))}
+          {shown.length === 0 && <p className="text-sm text-gray-300 text-center py-12">Sem mensagens.</p>}
+        </div>
+      </Card>
     </div>
   );
 }
 
 // ── Members ───────────────────────────────────────────────────────────
-function MembersTab() {
+function MembersTab({ showToast }) {
   const [view, setView] = useState("dataverse");
   const [dvStatus, setDvStatus] = useState(null);
   const [socios, setSocios] = useState([]);
@@ -362,10 +499,7 @@ function MembersTab() {
     try {
       const st = await ax.get("/dataverse/status");
       setDvStatus(st.data);
-      if (st.data.configured) {
-        const r = await ax.get("/dataverse/socios");
-        setSocios(Array.isArray(r.data) ? r.data : []);
-      }
+      if (st.data.configured) { const r = await ax.get("/dataverse/socios"); setSocios(Array.isArray(r.data) ? r.data : []); }
     } catch { setDvStatus({ configured: false, message: "Erro ao conectar" }); }
     finally { setDvLoading(false); }
   }, []);
@@ -373,15 +507,15 @@ function MembersTab() {
 
   const emptyForm = () => ({ cr56f_numerosocio: "", cr56f_nome: "", cr56f_estado: "", cr56f_datadenascimento: "", cr56f_telemovel: "", cr56f_email: "", cr56f_arruamento: "", cr56f_nporta: "", cr56f_codigopostal: "", cr56f_localidade: "", cr56f_datadeinscricao: new Date().toISOString().split("T")[0], cr56f_observacoes: "" });
   const startNew = () => { setForm(emptyForm()); setEditId(null); setShowForm(true); };
-  const startEdit = (s) => { const f = {}; Object.keys(emptyForm()).forEach(k => { f[k] = s[k] ?? ""; }); setEditId(s[Object.keys(s).find(k => k.endsWith("id") && k.startsWith("cr_"))] || ""); setForm(f); setShowForm(true); };
+  const startEdit = (s) => { const f = {}; Object.keys(emptyForm()).forEach(k => { f[k] = s[k] ?? ""; }); setEditId(s[Object.keys(s).find(k => k.endsWith("id") && k.startsWith("cr56f_"))] || ""); setForm(f); setShowForm(true); };
   const cancel = () => { setShowForm(false); setEditId(null); };
   const saveSocio = async () => {
     setSaving(true);
-    try { if (editId) await ax.put(`/dataverse/socios/${editId}`, form); else await ax.post("/dataverse/socios", form); cancel(); fetchSocios(); }
-    catch (e) { alert(e.response?.data?.detail || "Erro ao guardar"); }
+    try { if (editId) await ax.put(`/dataverse/socios/${editId}`, form); else await ax.post("/dataverse/socios", form); cancel(); fetchSocios(); showToast(editId ? "Socio atualizado!" : "Socio criado!"); }
+    catch (e) { showToast(e.response?.data?.detail || "Erro ao guardar", "error"); }
     finally { setSaving(false); }
   };
-  const updateMemberStatus = async (id, status) => { await ax.put(`/members/${id}/status`, { status }); fetchMembers(); };
+  const updateMemberStatus = async (id, status) => { await ax.put(`/members/${id}/status`, { status }); fetchMembers(); showToast("Estado atualizado!"); };
   const filtered = socios.filter(s => { if (!search) return true; const q = search.toLowerCase(); return (s.cr56f_nome || "").toLowerCase().includes(q) || (s.cr56f_email || "").toLowerCase().includes(q) || String(s.cr56f_numerosocio || "").includes(q); });
   const statusColors = { pending: "bg-yellow-50 text-yellow-700", approved: "bg-green-50 text-[var(--green-700)]", rejected: "bg-red-50 text-red-600" };
   const statusLabels = { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado" };
@@ -395,33 +529,36 @@ function MembersTab() {
   return (
     <div data-testid="admin-members-tab">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Gestao de Socios</h1>
+        <p className="text-sm text-gray-400">Gestao completa de socios.</p>
         <div className="flex gap-2">
           <button onClick={() => setView("dataverse")} data-testid="members-view-dataverse"
-            className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${view === "dataverse" ? "bg-[var(--green-700)] text-white" : "border border-[var(--border)] text-[var(--text-muted)]"}`}>Dataverse</button>
+            className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${view === "dataverse" ? "bg-[var(--green-700)] text-white shadow-sm" : "bg-white border border-gray-200 text-gray-400"}`}>Dataverse</button>
           <button onClick={() => setView("inscricoes")} data-testid="members-view-inscricoes"
-            className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${view === "inscricoes" ? "bg-[var(--green-700)] text-white" : "border border-[var(--border)] text-[var(--text-muted)]"}`}>Inscricoes ({members.filter(m => m.status === "pending").length})</button>
+            className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${view === "inscricoes" ? "bg-[var(--green-700)] text-white shadow-sm" : "bg-white border border-gray-200 text-gray-400"}`}>Inscricoes ({members.filter(m => m.status === "pending").length})</button>
         </div>
       </div>
       {view === "dataverse" ? (
         <div>
           {dvStatus && !dvStatus.configured && (
-            <Card className="p-4 mb-4 border-l-4 border-l-yellow-400">
-              <p className="text-sm text-yellow-700 font-medium">Dataverse nao configurado</p>
-              <p className="text-xs text-[var(--text-muted)] mt-1">{dvStatus.message}</p>
+            <Card className="p-5 mb-5 border-l-4 border-l-amber-400">
+              <p className="text-sm font-semibold text-amber-700">Dataverse nao configurado</p>
+              <p className="text-xs text-gray-400 mt-1">{dvStatus.message}</p>
             </Card>
           )}
-          <div className="flex items-center gap-3 mb-4">
-            <input type="text" placeholder="Pesquisar nome, email, num. socio..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 px-4 py-2.5 text-sm rounded-lg border border-[var(--border)] outline-none focus:border-[var(--green-700)]" data-testid="members-search" />
-            <Btn onClick={startNew} testId="add-socio-btn" disabled={dvStatus && !dvStatus.configured}><Plus size={14} />Novo Socio</Btn>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 relative">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+              <input type="text" placeholder="Pesquisar nome, email, num. socio..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-11 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 bg-white outline-none focus:border-[var(--green-700)] focus:ring-2 focus:ring-[var(--green-700)]/10" data-testid="members-search" />
+            </div>
+            <Btn onClick={startNew} testId="add-socio-btn" disabled={dvStatus && !dvStatus.configured}><Plus size={15} />Novo Socio</Btn>
           </div>
           {showForm && (
-            <Card className="p-5 mb-5">
-              <h3 className="text-sm font-semibold mb-3">{editId ? "Editar Socio" : "Novo Socio"}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card className="p-6 mb-5">
+              <h3 className="text-sm font-bold text-gray-700 mb-4">{editId ? "Editar Socio" : "Novo Socio"}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {FIELDS.map(f => (<div key={f.key} className={f.w ? "sm:col-span-3" : ""}><Inp label={f.label} value={form[f.key] ?? ""} onChange={v => setForm({...form, [f.key]: v})} type={f.type || "text"} rows={f.rows} testId={`socio-form-${f.key}`} /></div>))}
               </div>
-              <div className="flex gap-2 mt-4">
+              <div className="flex gap-3 mt-5">
                 <Btn onClick={saveSocio} disabled={saving} testId="socio-form-save"><Save size={14} />{saving ? "..." : "Guardar"}</Btn>
                 <Btn onClick={cancel} variant="secondary"><X size={14} />Cancelar</Btn>
               </div>
@@ -430,96 +567,96 @@ function MembersTab() {
           {dvLoading ? (
             <div className="text-center py-16"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin mx-auto" /></div>
           ) : dvStatus?.configured ? (
-            <div className="overflow-x-auto">
+            <Card className="overflow-hidden">
               <table className="w-full text-sm" data-testid="socios-table">
-                <thead><tr className="border-b border-[var(--border)] text-left">
-                  {["Num.", "Nome", "Estado", "Telemovel", "Email", "Localidade", ""].map(h => (<th key={h} className="py-2.5 px-3 font-semibold text-xs text-[var(--text-muted)]">{h}</th>))}
+                <thead><tr className="bg-gray-50/80">
+                  {["Num.", "Nome", "Estado", "Telemovel", "Email", "Localidade", ""].map(h => (<th key={h} className="py-3 px-5 text-left font-semibold text-xs text-gray-400 uppercase tracking-wider">{h}</th>))}
                 </tr></thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-50">
                   {filtered.map((s, i) => (
-                    <tr key={i} className="border-b border-[var(--border-light)] hover:bg-[var(--surface-alt)]">
-                      <td className="py-2.5 px-3 font-medium text-[var(--text-primary)]">{s.cr56f_numerosocio || "-"}</td>
-                      <td className="py-2.5 px-3 text-[var(--text-primary)]">{s.cr56f_nome || "-"}</td>
-                      <td className="py-2.5 px-3"><span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[var(--green-100)] text-[var(--green-700)]">{s.cr56f_estado || "-"}</span></td>
-                      <td className="py-2.5 px-3 text-[var(--text-muted)]">{s.cr56f_telemovel || "-"}</td>
-                      <td className="py-2.5 px-3 text-[var(--text-muted)]">{s.cr56f_email || "-"}</td>
-                      <td className="py-2.5 px-3 text-[var(--text-muted)]">{s.cr56f_localidade || "-"}</td>
-                      <td className="py-2.5 px-3"><button onClick={() => startEdit(s)} className="p-1 rounded hover:bg-[var(--surface-alt)] text-[var(--green-700)]"><Edit2 size={13} /></button></td>
+                    <tr key={i} className="hover:bg-gray-50/50 transition-colors group">
+                      <td className="py-3.5 px-5 font-semibold text-gray-700">{s.cr56f_numerosocio || "-"}</td>
+                      <td className="py-3.5 px-5 text-gray-700">{s.cr56f_nome || "-"}</td>
+                      <td className="py-3.5 px-5"><span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[var(--green-100)] text-[var(--green-700)]">{s.cr56f_estado || "-"}</span></td>
+                      <td className="py-3.5 px-5 text-gray-400">{s.cr56f_telemovel || "-"}</td>
+                      <td className="py-3.5 px-5 text-gray-400">{s.cr56f_email || "-"}</td>
+                      <td className="py-3.5 px-5 text-gray-400">{s.cr56f_localidade || "-"}</td>
+                      <td className="py-3.5 px-5"><button onClick={() => startEdit(s)} className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--green-100)] text-[var(--green-700)] transition-all"><Edit2 size={14} /></button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {filtered.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem socios.</p>}
-              <p className="text-xs text-[var(--text-muted)] mt-3">{filtered.length} de {socios.length} socios</p>
-            </div>
-          ) : <p className="text-sm text-[var(--text-muted)] text-center py-10">Configure o Dataverse para ver os socios.</p>}
+              {filtered.length === 0 && <p className="text-sm text-gray-300 text-center py-12">Sem socios encontrados.</p>}
+              <div className="px-5 py-3 border-t border-gray-50 text-xs text-gray-300">{filtered.length} de {socios.length} socios</div>
+            </Card>
+          ) : <Card className="p-12 text-center"><p className="text-sm text-gray-300">Configure o Dataverse para ver os socios.</p></Card>}
         </div>
       ) : (
-        <div className="space-y-2">
-          {members.map(m => (
-            <Card key={m.id} className="p-4"><div className="flex items-start justify-between gap-3"><div className="flex-1">
-              <div className="flex items-center gap-2 mb-1"><p className="text-sm font-semibold text-[var(--text-primary)]">{m.full_name}</p><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${statusColors[m.status] || ""}`}>{statusLabels[m.status] || m.status}</span></div>
-              <p className="text-xs text-[var(--text-muted)]">{m.email} | {m.phone}</p>
-              {m.address && <p className="text-xs text-[var(--text-muted)]">{m.address}</p>}
-              {m.message && <p className="text-xs italic text-[var(--text-secondary)] mt-1">"{m.message}"</p>}
-            </div><div className="flex gap-1 shrink-0">
-              {m.status !== "approved" && <button title="Aprovar" onClick={() => updateMemberStatus(m.id, "approved")} className="p-1.5 rounded hover:bg-green-50 text-[var(--green-700)]"><Check size={14} /></button>}
-              {m.status !== "rejected" && <button title="Rejeitar" onClick={() => updateMemberStatus(m.id, "rejected")} className="p-1.5 rounded hover:bg-red-50 text-red-500"><X size={14} /></button>}
-            </div></div></Card>
-          ))}
-          {members.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem inscricoes.</p>}
-        </div>
+        <Card className="overflow-hidden">
+          <div className="divide-y divide-gray-50">
+            {members.map(m => (
+              <div key={m.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50/50 transition-colors group">
+                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 shrink-0">{(m.full_name || "?")[0].toUpperCase()}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2"><p className="text-sm font-semibold text-gray-700">{m.full_name}</p><span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${statusColors[m.status]}`}>{statusLabels[m.status]}</span></div>
+                  <p className="text-xs text-gray-400">{m.email} · {m.phone}</p>
+                </div>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {m.status !== "approved" && <button onClick={() => updateMemberStatus(m.id, "approved")} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-green-50 text-[var(--green-700)]"><Check size={14} /></button>}
+                  {m.status !== "rejected" && <button onClick={() => updateMemberStatus(m.id, "rejected")} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 text-red-400"><X size={14} /></button>}
+                </div>
+              </div>
+            ))}
+            {members.length === 0 && <p className="text-sm text-gray-300 text-center py-12">Sem inscricoes.</p>}
+          </div>
+        </Card>
       )}
     </div>
   );
 }
 
 // ── Settings ──────────────────────────────────────────────────────────
-function SettingsTab() {
+function SettingsTab({ showToast }) {
   const [data, setData] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
 
   useEffect(() => { ax.get("/settings").then(r => setData(r.data)); }, []);
 
   const save = async () => {
-    setSaving(true); setMsg("");
-    try { await ax.put("/settings", data); setMsg("Guardado!"); setTimeout(() => setMsg(""), 2000); }
-    catch { setMsg("Erro"); }
+    setSaving(true);
+    try { await ax.put("/settings", data); showToast("Definicoes guardadas!"); }
+    catch { showToast("Erro ao guardar", "error"); }
     finally { setSaving(false); }
   };
 
-  if (!data) return <div className="animate-pulse text-sm text-[var(--text-muted)]">A carregar...</div>;
+  if (!data) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div data-testid="admin-settings-tab">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Definicoes do Site</h1>
-        <div className="flex items-center gap-3">
-          {msg && <span className="text-sm text-[var(--green-700)] font-medium">{msg}</span>}
-          <Btn onClick={save} disabled={saving} testId="save-settings"><Save size={14} />{saving ? "..." : "Guardar"}</Btn>
+    <div data-testid="admin-settings-tab" className="space-y-6 max-w-4xl">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-400">Configuracoes gerais do website.</p>
+        <Btn onClick={save} disabled={saving} testId="save-settings"><Save size={14} />{saving ? "..." : "Guardar"}</Btn>
+      </div>
+
+      <Card className="p-7">
+        <h3 className="text-sm font-bold text-gray-700 mb-5 flex items-center gap-2"><Settings size={15} className="text-[var(--green-700)]" /> Informacoes Gerais</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Inp label="Nome" value={data.society_name || ""} onChange={v => setData({...data, society_name: v})} />
+          <Inp label="Ano Fundacao" type="number" value={data.founding_year || ""} onChange={v => setData({...data, founding_year: parseInt(v) || 0})} />
+          <Inp label="Morada" value={data.address || ""} onChange={v => setData({...data, address: v})} />
+          <Inp label="Cidade" value={data.city || ""} onChange={v => setData({...data, city: v})} />
+          <Inp label="Email" value={data.email || ""} onChange={v => setData({...data, email: v})} />
+          <Inp label="Telefone" value={data.phone || ""} onChange={v => setData({...data, phone: v})} />
         </div>
-      </div>
-      <div className="space-y-5">
-        <Card className="p-6">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Informacoes Gerais</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Inp label="Nome da Sociedade" value={data.society_name || ""} onChange={v => setData({...data, society_name: v})} />
-            <Inp label="Ano de Fundacao" type="number" value={data.founding_year || ""} onChange={v => setData({...data, founding_year: parseInt(v) || 0})} />
-            <Inp label="Morada" value={data.address || ""} onChange={v => setData({...data, address: v})} />
-            <Inp label="Cidade" value={data.city || ""} onChange={v => setData({...data, city: v})} />
-            <Inp label="Email" value={data.email || ""} onChange={v => setData({...data, email: v})} />
-            <Inp label="Telefone" value={data.phone || ""} onChange={v => setData({...data, phone: v})} />
-          </div>
-        </Card>
-        <Card className="p-6">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Redes Sociais</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Inp label="Facebook URL" value={data.facebook_url || ""} onChange={v => setData({...data, facebook_url: v})} placeholder="https://facebook.com/..." />
-            <Inp label="Instagram URL" value={data.instagram_url || ""} onChange={v => setData({...data, instagram_url: v})} placeholder="https://instagram.com/..." />
-          </div>
-        </Card>
-      </div>
+      </Card>
+
+      <Card className="p-7">
+        <h3 className="text-sm font-bold text-gray-700 mb-5">Redes Sociais</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Inp label="Facebook" value={data.facebook_url || ""} onChange={v => setData({...data, facebook_url: v})} placeholder="https://facebook.com/..." />
+          <Inp label="Instagram" value={data.instagram_url || ""} onChange={v => setData({...data, instagram_url: v})} placeholder="https://instagram.com/..." />
+        </div>
+      </Card>
     </div>
   );
 }
