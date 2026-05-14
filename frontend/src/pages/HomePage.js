@@ -19,12 +19,71 @@ function SR({ children, className = "", delay = 0 }) {
   return <div ref={ref} className={`sr ${v ? "visible" : ""} ${className}`} style={{ transitionDelay: `${delay}ms` }}>{children}</div>;
 }
 
+function CountUp({ end, suffix = "", duration = 900 }) {
+  const ref = useRef(null);
+  const [value, setValue] = useState(0);
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setStarted(true);
+      },
+      { threshold: 0.4 }
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!started) return;
+
+    let rafId;
+    const start = performance.now();
+
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+    const tick = (now) => {
+      const raw = Math.min((now - start) / duration, 1);
+      const eased = easeOutCubic(raw);
+      setValue(Math.round(end * eased));
+
+      if (raw < 1) {
+        rafId = requestAnimationFrame(tick);
+      }
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [started, end, duration]);
+
+  return <span ref={ref}>{value}{suffix}</span>;
+}
+
+
+
 export default function HomePage() {
   const [events, setEvents] = useState([]);
+  const [content, setContent] = useState({});
+  const [services, setServices] = useState([]);
 
   useEffect(() => {
     axios.get(`${API}/events/upcoming`).then(r => setEvents(r.data)).catch(() => {});
+    axios.get(`${API}/content/homepage`).then(r => setContent(r.data)).catch(() => {});
+    axios.get(`${API}/services`).then(r => setServices(r.data)).catch(() => {});
   }, []);
+
+  const heroTitle = content.hero_title || "Sociedade Recreativa Desportiva e Familiar de São João das Lampas";
+  const heroSub = content.hero_subtitle || "Cultura, desporto, teatro e convivio. Mais de 114 anos ao servico da nossa comunidade.";
+  const heroBadge = content.hero_badge || "Desde 1911 — S. Joao das Lampas";
+  const aboutLabel = content.about_label || "Quem somos";
+  const aboutTitle = content.about_title || "O coracao de Sao Joao das Lampas";
+  const aboutText = content.about_text || "Ha mais de um seculo, a SRDFSJL e o ponto de encontro da nossa comunidade.";
+  const stats = content.stats || [{ val: 1911, label: "Fundacao", suffix: "" }, { val: 114, label: "Anos", suffix: "" }, { val: 500, label: "Socios", suffix: "+" }, { val: 50, label: "Eventos/Ano", suffix: "+" }];
 
   return (
     <div>
@@ -38,13 +97,13 @@ export default function HomePage() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm mb-8 opacity-0 anim-fade-up d1">
               <div className="w-1.5 h-1.5 rounded-full bg-[var(--green-500)]" />
-              <span className="text-xs font-medium text-white/70 tracking-wide">Desde 1911 &mdash; S. Joao das Lampas</span>
+              <span className="text-xs font-medium text-white/70 tracking-wide">{heroBadge}</span>
             </div>
             <h1 className="text-3xl sm:text-5xl lg:text-[3.2rem] font-bold text-white leading-[1.15] mb-6 opacity-0 anim-fade-up d2 max-w-[1100px]">
-              Sociedade Recreativa Desportiva e Familiar de São João das Lampas
+              {heroTitle}
             </h1>
             <p className="text-base sm:text-lg text-white/60 max-w-lg mb-10 leading-relaxed opacity-0 anim-fade-up d3">
-              Cultura, desporto, teatro e convivio. Mais de 114 anos ao servico da nossa comunidade.
+              {heroSub}
             </p>
             <div className="flex flex-wrap gap-3 opacity-0 anim-fade-up d4">
               <Link
@@ -72,15 +131,14 @@ export default function HomePage() {
       <section className="relative z-20 -mt-16 px-5 sm:px-8">
         <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-[var(--border-light)] overflow-hidden">
           <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-[var(--border-light)]">
-            {[
-              { val: "1911", label: "Fundacao" },
-              { val: "114", label: "Anos" },
-              { val: "500+", label: "Socios" },
-              { val: "50+", label: "Eventos/Ano" },
-            ].map(s => (
+            {stats.map((s) => (
               <div key={s.label} className="text-center py-7 px-4">
-                <p className="text-2xl sm:text-3xl font-bold text-[var(--green-700)]">{s.val}</p>
-                <p className="text-[11px] font-medium text-[var(--text-muted)] tracking-wider uppercase mt-1">{s.label}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-[var(--green-700)]">
+                  <CountUp end={s.val} suffix={s.suffix} />
+                </p>
+                <p className="text-[11px] font-medium text-[var(--text-muted)] tracking-wider uppercase mt-1">
+                  {s.label}
+                </p>
               </div>
             ))}
           </div>
@@ -92,35 +150,34 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
           <SR>
             <div className="max-w-2xl mx-auto text-center mb-16">
-              <span className="inline-block text-xs font-semibold tracking-widest uppercase text-[var(--green-700)] mb-3">Quem somos</span>
+              <span className="inline-block text-s font-semibold tracking-widest uppercase text-[var(--green-700)] mb-3">{aboutLabel}</span>
               <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] mb-5">
-                O coracao de S. Joao das Lampas
+                {aboutTitle}
               </h2>
               <p className="text-base text-[var(--text-secondary)] leading-relaxed">
-                Ha mais de um seculo, a SRDFSJL e o ponto de encontro da nossa comunidade. 
-                Um espaco onde se vive o desporto, a cultura e a tradicao.
+                {aboutText}
               </p>
             </div>
           </SR>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {[
-              { icon: Theater, title: "Teatro", desc: "Grupo de teatro amador com pecas que encantam a comunidade.", color: "var(--green-700)" },
-              { icon: Trophy, title: "Desporto", desc: "Torneios, caminhadas e atividades para todas as idades.", color: "var(--green-600)" },
-              { icon: Building2, title: "Espaco", desc: "Salao disponivel para eventos, festas e celebracoes.", color: "var(--green-500)" },
-            ].map((s, i) => (
-              <SR key={s.title} delay={i * 120}>
+            {(services.length > 0 ? services.slice(0, 3) : [
+              { id: "1", title: "Teatro", tag: "Cultura", description: "Grupo de teatro amador com pecas que encantam a comunidade." },
+              { id: "2", title: "Desporto", tag: "Desporto", description: "Torneios, caminhadas e atividades para todas as idades." },
+              { id: "3", title: "Espaco", tag: "Eventos", description: "Salao disponivel para eventos, festas e celebracoes." },
+            ]).map((s, i) => (
+              <SR key={s.id} delay={i * 120}>
                 <Link
                   to="/servicos"
                   className="group block p-7 rounded-xl border border-[var(--border)] bg-white lift"
                 >
                   <div className="w-11 h-11 rounded-lg flex items-center justify-center mb-5" style={{ backgroundColor: "var(--green-100)" }}>
-                    <s.icon size={20} style={{ color: s.color }} />
+                    {i === 0 ? <Theater size={20} style={{ color: "var(--green-700)" }} /> : i === 1 ? <Trophy size={20} style={{ color: "var(--green-600)" }} /> : <Building2 size={20} style={{ color: "var(--green-500)" }} />}
                   </div>
                   <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2 flex items-center gap-2">
                     {s.title}
                     <ArrowUpRight size={14} className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
                   </h3>
-                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{s.desc}</p>
+                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{s.description}</p>
                 </Link>
               </SR>
             ))}
@@ -134,7 +191,7 @@ export default function HomePage() {
           <SR>
             <div className="flex items-end justify-between mb-10">
               <div>
-                <span className="text-xs font-semibold tracking-widest uppercase text-[var(--green-700)] mb-2 block">Agenda</span>
+                <span className="text-s font-semibold tracking-widest uppercase text-[var(--green-700)] mb-2 block">Agenda</span>
                 <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)]">Proximos Eventos</h2>
               </div>
               <Link

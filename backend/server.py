@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
@@ -15,50 +15,41 @@ import jwt
 import uuid
 import secrets
 from datetime import datetime, timezone, timedelta
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
 
-# MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# JWT config
 JWT_SECRET = os.environ.get('JWT_SECRET', secrets.token_hex(32))
 JWT_ALGORITHM = "HS256"
 
-# Create the main app
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Password Helpers ---
-def hash_password(password: str) -> str:
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+# ── Helpers ──────────────────────────────────────────────────────────────
+def hash_password(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
-# --- JWT Helpers ---
-def create_access_token(user_id: str, email: str) -> str:
-    payload = {"sub": user_id, "email": email, "exp": datetime.now(timezone.utc) + timedelta(minutes=60), "type": "access"}
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+def create_access_token(uid: str, email: str) -> str:
+    return jwt.encode({"sub": uid, "email": email, "exp": datetime.now(timezone.utc) + timedelta(minutes=60), "type": "access"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-def create_refresh_token(user_id: str) -> str:
-    payload = {"sub": user_id, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "refresh"}
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+def create_refresh_token(uid: str) -> str:
+    return jwt.encode({"sub": uid, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "refresh"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-# --- Auth Helper ---
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get("access_token")
     if not token:
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:]
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
@@ -76,7 +67,13 @@ async def get_current_user(request: Request) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# --- Pydantic Models ---
+async def require_admin(request: Request) -> dict:
+    user = await get_current_user(request)
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return user
+
+# ── Models ───────────────────────────────────────────────────────────────
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -99,11 +96,52 @@ class EventUpdate(BaseModel):
     price: Optional[str] = None
     image_url: Optional[str] = None
 
-class GalleryItemCreate(BaseModel):
+class ServiceCreate(BaseModel):
     title: str
-    image_url: str
-    description: Optional[str] = ""
-    category: Optional[str] = ""
+    tag: str
+    description: str
+    image_url: Optional[str] = ""
+    note: Optional[str] = ""
+    order: Optional[int] = 0
+
+class ServiceUpdate(BaseModel):
+    title: Optional[str] = None
+    tag: Optional[str] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    note: Optional[str] = None
+    order: Optional[int] = None
+
+class TimelineCreate(BaseModel):
+    year: str
+    title: str
+    description: str
+    order: Optional[int] = 0
+
+class TimelineUpdate(BaseModel):
+    year: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    order: Optional[int] = None
+
+class SiteSettingsUpdate(BaseModel):
+    society_name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    founding_year: Optional[int] = None
+    facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+
+class HomepageContentUpdate(BaseModel):
+    hero_title: Optional[str] = None
+    hero_subtitle: Optional[str] = None
+    hero_badge: Optional[str] = None
+    about_label: Optional[str] = None
+    about_title: Optional[str] = None
+    about_text: Optional[str] = None
+    stats: Optional[List[Dict[str, Any]]] = None
 
 class MemberRegister(BaseModel):
     full_name: str
@@ -119,21 +157,19 @@ class ContactMessage(BaseModel):
     subject: Optional[str] = ""
     message: str
 
-# --- Auth Endpoints ---
+# ── Auth ─────────────────────────────────────────────────────────────────
 @api_router.post("/auth/login")
 async def login(request: Request, response: Response, body: LoginRequest):
     email = body.email.lower().strip()
     user = await db.users.find_one({"email": email})
-    if not user:
+    if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not verify_password(body.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    user_id = str(user["_id"])
-    access_token = create_access_token(user_id, email)
-    refresh_token = create_refresh_token(user_id)
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=3600, path="/")
-    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
-    return {"id": user_id, "email": user["email"], "name": user.get("name", ""), "role": user.get("role", "user"), "token": access_token}
+    uid = str(user["_id"])
+    at = create_access_token(uid, email)
+    rt = create_refresh_token(uid)
+    response.set_cookie(key="access_token", value=at, httponly=True, secure=False, samesite="lax", max_age=3600, path="/")
+    response.set_cookie(key="refresh_token", value=rt, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
+    return {"id": uid, "email": user["email"], "name": user.get("name", ""), "role": user.get("role", "user"), "token": at}
 
 @api_router.post("/auth/logout")
 async def logout(response: Response):
@@ -143,164 +179,232 @@ async def logout(response: Response):
 
 @api_router.get("/auth/me")
 async def get_me(request: Request):
-    user = await get_current_user(request)
-    return user
+    return await get_current_user(request)
 
-# --- Events Endpoints ---
+# ── Dashboard Stats ──────────────────────────────────────────────────────
+@api_router.get("/admin/stats")
+async def get_admin_stats(request: Request):
+    await require_admin(request)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    events_total = await db.events.count_documents({})
+    events_upcoming = await db.events.count_documents({"date": {"$gte": today}})
+    members_total = await db.members.count_documents({})
+    members_pending = await db.members.count_documents({"status": "pending"})
+    messages_total = await db.contacts.count_documents({})
+    messages_unread = await db.contacts.count_documents({"read": False})
+    services_total = await db.services.count_documents({})
+    return {
+        "events": {"total": events_total, "upcoming": events_upcoming},
+        "members": {"total": members_total, "pending": members_pending},
+        "messages": {"total": messages_total, "unread": messages_unread},
+        "services": {"total": services_total},
+    }
+
+# ── Events ───────────────────────────────────────────────────────────────
 @api_router.get("/events")
 async def get_events():
-    events = await db.events.find({}, {"_id": 0}).sort("date", -1).to_list(100)
-    return events
+    return await db.events.find({}, {"_id": 0}).sort("date", -1).to_list(100)
 
 @api_router.get("/events/upcoming")
 async def get_upcoming_events():
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    events = await db.events.find({"date": {"$gte": today}}, {"_id": 0}).sort("date", 1).to_list(10)
-    return events
+    return await db.events.find({"date": {"$gte": today}}, {"_id": 0}).sort("date", 1).to_list(10)
 
 @api_router.post("/events")
 async def create_event(request: Request, body: EventCreate):
-    user = await get_current_user(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-    event_id = str(uuid.uuid4())
-    doc = {
-        "id": event_id,
-        "title": body.title,
-        "description": body.description,
-        "date": body.date,
-        "time": body.time or "",
-        "location": body.location or "",
-        "price": body.price or "",
-        "image_url": body.image_url or "",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
+    await require_admin(request)
+    doc = {"id": str(uuid.uuid4()), **body.model_dump(), "created_at": datetime.now(timezone.utc).isoformat()}
     await db.events.insert_one(doc)
     doc.pop("_id", None)
     return doc
 
 @api_router.put("/events/{event_id}")
 async def update_event(event_id: str, request: Request, body: EventUpdate):
-    user = await get_current_user(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-    update_data = {k: v for k, v in body.model_dump().items() if v is not None}
-    if not update_data:
+    await require_admin(request)
+    data = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
-    result = await db.events.update_one({"id": event_id}, {"$set": update_data})
+    result = await db.events.update_one({"id": event_id}, {"$set": data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Event not found")
-    updated = await db.events.find_one({"id": event_id}, {"_id": 0})
-    return updated
+    return await db.events.find_one({"id": event_id}, {"_id": 0})
 
 @api_router.delete("/events/{event_id}")
 async def delete_event(event_id: str, request: Request):
-    user = await get_current_user(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
+    await require_admin(request)
     result = await db.events.delete_one({"id": event_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Event not found")
-    return {"message": "Event deleted"}
+    return {"message": "Deleted"}
 
-# --- Gallery Endpoints ---
-@api_router.get("/gallery")
-async def get_gallery():
-    items = await db.gallery.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
-    return items
+# ── Services ─────────────────────────────────────────────────────────────
+@api_router.get("/services")
+async def get_services():
+    return await db.services.find({}, {"_id": 0}).sort("order", 1).to_list(50)
 
-@api_router.post("/gallery")
-async def add_gallery_item(request: Request, body: GalleryItemCreate):
-    user = await get_current_user(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-    item_id = str(uuid.uuid4())
-    doc = {
-        "id": item_id,
-        "title": body.title,
-        "image_url": body.image_url,
-        "description": body.description or "",
-        "category": body.category or "",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.gallery.insert_one(doc)
+@api_router.post("/services")
+async def create_service(request: Request, body: ServiceCreate):
+    await require_admin(request)
+    doc = {"id": str(uuid.uuid4()), **body.model_dump(), "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.services.insert_one(doc)
     doc.pop("_id", None)
     return doc
 
-@api_router.delete("/gallery/{item_id}")
-async def delete_gallery_item(item_id: str, request: Request):
-    user = await get_current_user(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-    result = await db.gallery.delete_one({"id": item_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Gallery item not found")
-    return {"message": "Gallery item deleted"}
+@api_router.put("/services/{service_id}")
+async def update_service(service_id: str, request: Request, body: ServiceUpdate):
+    await require_admin(request)
+    data = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields")
+    result = await db.services.update_one({"id": service_id}, {"$set": data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return await db.services.find_one({"id": service_id}, {"_id": 0})
 
-# --- Member Registration ---
+@api_router.delete("/services/{service_id}")
+async def delete_service(service_id: str, request: Request):
+    await require_admin(request)
+    result = await db.services.delete_one({"id": service_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"message": "Deleted"}
+
+# ── Timeline ─────────────────────────────────────────────────────────────
+@api_router.get("/timeline")
+async def get_timeline():
+    return await db.timeline.find({}, {"_id": 0}).sort("order", 1).to_list(50)
+
+@api_router.post("/timeline")
+async def create_timeline(request: Request, body: TimelineCreate):
+    await require_admin(request)
+    doc = {"id": str(uuid.uuid4()), **body.model_dump(), "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.timeline.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.put("/timeline/{item_id}")
+async def update_timeline(item_id: str, request: Request, body: TimelineUpdate):
+    await require_admin(request)
+    data = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields")
+    result = await db.timeline.update_one({"id": item_id}, {"$set": data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return await db.timeline.find_one({"id": item_id}, {"_id": 0})
+
+@api_router.delete("/timeline/{item_id}")
+async def delete_timeline(item_id: str, request: Request):
+    await require_admin(request)
+    result = await db.timeline.delete_one({"id": item_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"message": "Deleted"}
+
+# ── Site Settings ────────────────────────────────────────────────────────
+@api_router.get("/settings")
+async def get_settings():
+    doc = await db.settings.find_one({"_key": "site"}, {"_id": 0, "_key": 0})
+    return doc or {}
+
+@api_router.put("/settings")
+async def update_settings(request: Request, body: SiteSettingsUpdate):
+    await require_admin(request)
+    data = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields")
+    await db.settings.update_one({"_key": "site"}, {"$set": data}, upsert=True)
+    doc = await db.settings.find_one({"_key": "site"}, {"_id": 0, "_key": 0})
+    return doc
+
+# ── Homepage Content ─────────────────────────────────────────────────────
+@api_router.get("/content/homepage")
+async def get_homepage_content():
+    doc = await db.content.find_one({"_key": "homepage"}, {"_id": 0, "_key": 0})
+    return doc or {}
+
+@api_router.put("/content/homepage")
+async def update_homepage_content(request: Request, body: HomepageContentUpdate):
+    await require_admin(request)
+    data = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields")
+    await db.content.update_one({"_key": "homepage"}, {"$set": data}, upsert=True)
+    doc = await db.content.find_one({"_key": "homepage"}, {"_id": 0, "_key": 0})
+    return doc
+
+# ── Members ──────────────────────────────────────────────────────────────
 @api_router.post("/members")
 async def register_member(body: MemberRegister):
     existing = await db.members.find_one({"email": body.email.lower().strip()})
     if existing:
-        raise HTTPException(status_code=400, detail="Este email já está registado")
-    member_id = str(uuid.uuid4())
-    doc = {
-        "id": member_id,
-        "full_name": body.full_name,
-        "email": body.email.lower().strip(),
-        "phone": body.phone,
-        "address": body.address or "",
-        "birth_date": body.birth_date or "",
-        "message": body.message or "",
-        "status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
+        raise HTTPException(status_code=400, detail="Este email ja esta registado")
+    doc = {"id": str(uuid.uuid4()), **body.model_dump(), "email": body.email.lower().strip(), "status": "pending", "created_at": datetime.now(timezone.utc).isoformat()}
     await db.members.insert_one(doc)
     doc.pop("_id", None)
-    return {"message": "Inscrição enviada com sucesso!", "member": doc}
+    return {"message": "Inscricao enviada com sucesso!", "member": doc}
 
 @api_router.get("/members")
 async def get_members(request: Request):
-    user = await get_current_user(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-    members = await db.members.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
-    return members
+    await require_admin(request)
+    return await db.members.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
 
-# --- Contact ---
+@api_router.put("/members/{member_id}/status")
+async def update_member_status(member_id: str, request: Request):
+    await require_admin(request)
+    body = await request.json()
+    status = body.get("status")
+    if status not in ("pending", "approved", "rejected"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+    result = await db.members.update_one({"id": member_id}, {"$set": {"status": status}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"message": "Updated"}
+
+# ── Contact ──────────────────────────────────────────────────────────────
 @api_router.post("/contact")
 async def send_contact(body: ContactMessage):
-    msg_id = str(uuid.uuid4())
-    doc = {
-        "id": msg_id,
-        "name": body.name,
-        "email": body.email,
-        "subject": body.subject or "",
-        "message": body.message,
-        "read": False,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
+    doc = {"id": str(uuid.uuid4()), **body.model_dump(), "read": False, "replied": False, "created_at": datetime.now(timezone.utc).isoformat()}
     await db.contacts.insert_one(doc)
     doc.pop("_id", None)
     return {"message": "Mensagem enviada com sucesso!"}
 
 @api_router.get("/contacts")
 async def get_contacts(request: Request):
-    user = await get_current_user(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-    contacts = await db.contacts.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
-    return contacts
+    await require_admin(request)
+    return await db.contacts.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
 
-# --- Health ---
+@api_router.put("/contacts/{msg_id}")
+async def update_contact(msg_id: str, request: Request):
+    await require_admin(request)
+    body = await request.json()
+    data = {}
+    if "read" in body:
+        data["read"] = bool(body["read"])
+    if "replied" in body:
+        data["replied"] = bool(body["replied"])
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields")
+    result = await db.contacts.update_one({"id": msg_id}, {"$set": data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"message": "Updated"}
+
+@api_router.delete("/contacts/{msg_id}")
+async def delete_contact(msg_id: str, request: Request):
+    await require_admin(request)
+    result = await db.contacts.delete_one({"id": msg_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"message": "Deleted"}
+
+# ── Health ───────────────────────────────────────────────────────────────
 @api_router.get("/")
 async def root():
     return {"message": "SRDFSJL API is running"}
 
-# Include router
 app.include_router(api_router)
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
@@ -309,10 +413,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Startup - seed admin + indexes
+# ── Startup ──────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
-    # Create indexes
     await db.users.create_index("email", unique=True)
     await db.events.create_index("date")
     await db.members.create_index("email", unique=True)
@@ -322,94 +425,50 @@ async def startup():
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
-        hashed = hash_password(admin_password)
-        await db.users.insert_one({
-            "email": admin_email,
-            "password_hash": hashed,
-            "name": "Administrador",
-            "role": "admin",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-        logger.info(f"Admin user seeded: {admin_email}")
+        await db.users.insert_one({"email": admin_email, "password_hash": hash_password(admin_password), "name": "Administrador", "role": "admin", "created_at": datetime.now(timezone.utc).isoformat()})
+        logger.info(f"Admin seeded: {admin_email}")
     elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one(
-            {"email": admin_email},
-            {"$set": {"password_hash": hash_password(admin_password)}}
-        )
-        logger.info(f"Admin password updated: {admin_email}")
+        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
 
-    # Seed sample events
-    event_count = await db.events.count_documents({})
-    if event_count == 0:
-        sample_events = [
-            {
-                "id": str(uuid.uuid4()),
-                "title": "Festa de São João",
-                "description": "Celebração tradicional da nossa freguesia com música ao vivo, arraial e fogo de artifício.",
-                "date": "2026-06-24",
-                "time": "19:00",
-                "location": "Sede da SRDFSJL",
-                "price": "Entrada livre",
-                "image_url": "",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "title": "Peça de Teatro - Que Grande Mixórdia",
-                "description": "O grupo de teatro apresenta 'Que Grande Mixórdia' - uma revista à portuguesa... mas saloia!",
-                "date": "2026-07-15",
-                "time": "21:30",
-                "location": "Salão da SRDFSJL",
-                "price": "12€",
-                "image_url": "",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "title": "Torneio de Futebol de Salão",
-                "description": "Torneio aberto a todos os sócios e amigos. Inscrições até dia 10 de Agosto.",
-                "date": "2026-08-20",
-                "time": "10:00",
-                "location": "Campo da SRDFSJL",
-                "price": "5€ por equipa",
-                "image_url": "",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-        ]
-        await db.events.insert_many(sample_events)
-        logger.info("Sample events seeded")
+    # Seed default settings
+    if not await db.settings.find_one({"_key": "site"}):
+        await db.settings.insert_one({"_key": "site", "society_name": "Sociedade Recreativa Desportiva e Familiar de Sao Joao das Lampas", "address": "Avenida Central 24", "city": "S. Joao das Lampas, Sintra", "email": "geral@sociedadesaojoaodaslampas.pt", "phone": "", "founding_year": 1911, "facebook_url": "", "instagram_url": ""})
 
-    # Seed sample gallery
-    gallery_count = await db.gallery.count_documents({})
-    if gallery_count == 0:
-        sample_gallery = [
-            {
-                "id": str(uuid.uuid4()),
-                "title": "Festa de Aniversário 2024",
-                "image_url": "https://images.unsplash.com/photo-1743704952974-b4f411f5ceef?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHxQb3J0dWd1ZXNlJTIwdmlsbGFnZSUyMGNvbW11bml0eSUyMGdhdGhlcmluZ3xlbnwwfHx8fDE3NzgzNTM0NjF8MA&ixlib=rb-4.1.0&q=85",
-                "description": "Festa de comemoração do aniversário da Sociedade",
-                "category": "Eventos",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "title": "Espetáculo de Teatro",
-                "image_url": "https://images.pexels.com/photos/19658083/pexels-photo-19658083.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-                "description": "Espetáculo do grupo de teatro da SRDFSJL",
-                "category": "Teatro",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "title": "Torneio Desportivo",
-                "image_url": "https://images.unsplash.com/photo-1771909719482-4f95e62f41a7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwyfHxpbmRvb3IlMjBzcG9ydHMlMjBoYWxsfGVufDB8fHx8MTc3ODM1MzM5Mnww&ixlib=rb-4.1.0&q=85",
-                "description": "Torneio desportivo anual da Sociedade",
-                "category": "Desporto",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
+    # Seed default homepage content
+    if not await db.content.find_one({"_key": "homepage"}):
+        await db.content.insert_one({"_key": "homepage", "hero_title": "Sociedade Recreativa Desportiva e Familiar de Sao Joao das Lampas", "hero_subtitle": "Cultura, desporto, teatro e convivio. Mais de 114 anos ao servico da nossa comunidade.", "hero_badge": "Desde 1911 — S. Joao das Lampas", "about_label": "Quem somos", "about_title": "O coracao de Sao Joao das Lampas", "about_text": "Ha mais de um seculo, a SRDFSJL e o ponto de encontro da nossa comunidade. Um espaco onde se vive o desporto, a cultura e a tradicao.", "stats": [{"val": 1911, "label": "Fundacao", "suffix": ""}, {"val": 114, "label": "Anos", "suffix": ""}, {"val": 500, "label": "Socios", "suffix": "+"}, {"val": 50, "label": "Eventos/Ano", "suffix": "+"}]})
+
+    # Seed services
+    if await db.services.count_documents({}) == 0:
+        await db.services.insert_many([
+            {"id": str(uuid.uuid4()), "title": "Grupo de Teatro", "tag": "Cultura", "description": "O nosso grupo de teatro amador e uma das atividades mais emblematicas. Com pecas originais, os nossos atores levam ao palco historias que fazem rir e emocionar.", "image_url": "https://images.pexels.com/photos/19658083/pexels-photo-19658083.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940", "note": "Proxima peca: Que Grande Mixordia", "order": 0, "created_at": datetime.now(timezone.utc).isoformat()},
+            {"id": str(uuid.uuid4()), "title": "Atividades Desportivas", "tag": "Desporto", "description": "Torneios de futebol de salao, caminhadas, ginastica e muito mais. O desporto e parte fundamental da nossa missao comunitaria.", "image_url": "https://images.unsplash.com/photo-1771909719482-4f95e62f41a7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwyfHxpbmRvb3IlMjBzcG9ydHMlMjBoYWxsfGVufDB8fHx8MTc3ODM1MzM5Mnww&ixlib=rb-4.1.0&q=85", "note": "Torneios anuais abertos a todos", "order": 1, "created_at": datetime.now(timezone.utc).isoformat()},
+            {"id": str(uuid.uuid4()), "title": "Aluguer de Salao", "tag": "Eventos", "description": "O nosso salao esta disponivel para festas, casamentos, batizados e outros eventos. Um espaco versatil no coracao de S. Joao das Lampas.", "image_url": "https://images.unsplash.com/photo-1778086170602-f40da010e5fb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwyfHxjb21tdW5pdHklMjBnYXRoZXJpbmclMjBoYWxsfGVufDB8fHx8MTc3ODM1MzM5Nnww&ixlib=rb-4.1.0&q=85", "note": "Contacte-nos para reservas", "order": 2, "created_at": datetime.now(timezone.utc).isoformat()},
+        ])
+
+    # Seed timeline
+    if await db.timeline.count_documents({}) == 0:
+        items = [
+            {"year": "1911", "title": "Fundacao", "description": "A Sociedade Recreativa Desportiva e Familiar de S. Joao das Lampas e fundada a 29 de Julho de 1911.", "order": 0},
+            {"year": "1920s", "title": "Primeiras Atividades", "description": "Inicio das atividades desportivas e culturais, tornando-se o centro de convivio da comunidade.", "order": 1},
+            {"year": "1950s", "title": "Expansao", "description": "Construcao do salao de festas e novas instalacoes para a pratica desportiva.", "order": 2},
+            {"year": "1970s", "title": "Grupo de Teatro", "description": "Criacao do grupo de teatro amador, uma das atividades mais emblematicas da sociedade.", "order": 3},
+            {"year": "1990s", "title": "Modernizacao", "description": "Obras de renovacao e diversificacao das atividades oferecidas.", "order": 4},
+            {"year": "2011", "title": "Centenario", "description": "Celebracao dos 100 anos com eventos especiais e homenagens aos fundadores.", "order": 5},
+            {"year": "Hoje", "title": "Ao Servico da Comunidade", "description": "Continuamos a servir S. Joao das Lampas com cultura, desporto e recreacao.", "order": 6},
         ]
-        await db.gallery.insert_many(sample_gallery)
-        logger.info("Sample gallery seeded")
+        for it in items:
+            it["id"] = str(uuid.uuid4())
+            it["created_at"] = datetime.now(timezone.utc).isoformat()
+        await db.timeline.insert_many(items)
+
+    # Seed events if empty
+    if await db.events.count_documents({}) == 0:
+        await db.events.insert_many([
+            {"id": str(uuid.uuid4()), "title": "Festa de Sao Joao", "description": "Celebracao tradicional com musica ao vivo, arraial e fogo de artificio.", "date": "2026-06-24", "time": "19:00", "location": "Sede da SRDFSJL", "price": "Entrada livre", "image_url": "", "created_at": datetime.now(timezone.utc).isoformat()},
+            {"id": str(uuid.uuid4()), "title": "Peca de Teatro - Que Grande Mixordia", "description": "O grupo de teatro apresenta 'Que Grande Mixordia' - uma revista a portuguesa... mas saloia!", "date": "2026-07-15", "time": "21:30", "location": "Salao da SRDFSJL", "price": "12 euros", "image_url": "", "created_at": datetime.now(timezone.utc).isoformat()},
+            {"id": str(uuid.uuid4()), "title": "Torneio de Futebol de Salao", "description": "Torneio aberto a todos os socios e amigos.", "date": "2026-08-20", "time": "10:00", "location": "Campo da SRDFSJL", "price": "5 euros por equipa", "image_url": "", "created_at": datetime.now(timezone.utc).isoformat()},
+        ])
 
     logger.info("SRDFSJL API started successfully")
 

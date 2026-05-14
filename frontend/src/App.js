@@ -7,7 +7,6 @@ import EventosPage from "@/pages/EventosPage";
 import ServicosPage from "@/pages/ServicosPage";
 import ContactosPage from "@/pages/ContactosPage";
 import InscricaoPage from "@/pages/InscricaoPage";
-import GaleriaPage from "@/pages/GaleriaPage";
 import AdminLoginPage from "@/pages/AdminLoginPage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import { AuthProvider } from "@/context/AuthContext";
@@ -24,7 +23,6 @@ function App() {
             <Route path="/servicos" element={<ServicosPage />} />
             <Route path="/contactos" element={<ContactosPage />} />
             <Route path="/inscricao" element={<InscricaoPage />} />
-            <Route path="/galeria" element={<GaleriaPage />} />
           </Route>
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin" element={<AdminDashboard />} />

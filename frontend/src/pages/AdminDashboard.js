@@ -1,384 +1,441 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import {
-  LogOut, Calendar, Image, Users, Mail, Plus, Trash2, Edit2, Save, X, LayoutDashboard,
+  LogOut, LayoutDashboard, Calendar, Briefcase, Clock as ClockIcon, Mail, Settings, Users,
+  Plus, Trash2, Edit2, Save, X, Check, Eye, Reply, ExternalLink, ArrowUp, ArrowDown,
+  TrendingUp, MessageSquare, UserPlus, CalendarDays,
 } from "lucide-react";
 import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const ax = axios.create({ baseURL: API, withCredentials: true });
 
 export default function AdminDashboard() {
   const { user, loading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState("events");
+  const [tab, setTab] = useState("dashboard");
 
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== "admin")) {
-      navigate("/admin/login");
-    }
+    if (!authLoading && (!user || user.role !== "admin")) navigate("/admin/login");
   }, [user, authLoading, navigate]);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
-        <div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin" /></div>;
   if (!user || user.role !== "admin") return null;
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/admin/login");
-  };
-
   const TABS = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "homepage", label: "Homepage", icon: TrendingUp },
     { id: "events", label: "Eventos", icon: Calendar },
-    { id: "gallery", label: "Galeria", icon: Image },
+    { id: "services", label: "Servicos", icon: Briefcase },
+    { id: "timeline", label: "Cronologia", icon: ClockIcon },
+    { id: "messages", label: "Mensagens", icon: Mail },
     { id: "members", label: "Socios", icon: Users },
-    { id: "contacts", label: "Mensagens", icon: Mail },
+    { id: "settings", label: "Definicoes", icon: Settings },
   ];
 
   return (
     <div className="min-h-screen flex bg-[var(--bg)]">
-      {/* Sidebar */}
-      <aside className="w-60 min-h-screen flex flex-col border-r border-[var(--border)] bg-white" data-testid="admin-sidebar">
-        <div className="p-5 border-b border-[var(--border)]">
-          <div className="flex items-center gap-2">
-            <LayoutDashboard size={18} className="text-[var(--green-700)]" />
-            <h2 className="text-sm font-bold text-[var(--text-primary)]">Admin SRDFSJL</h2>
-          </div>
-          <p className="text-xs text-[var(--text-muted)] mt-1">{user.email}</p>
+      <aside className="w-56 min-h-screen flex flex-col border-r border-[var(--border)] bg-white" data-testid="admin-sidebar">
+        <div className="p-4 border-b border-[var(--border)]">
+          <h2 className="text-sm font-bold text-[var(--text-primary)]">Admin SRDFSJL</h2>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">{user.email}</p>
         </div>
-
-        <nav className="flex-1 p-3 space-y-0.5">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              data-testid={`admin-tab-${t.id}`}
-              onClick={() => setTab(t.id)}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                tab === t.id ? "bg-[var(--green-700)] text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"
-              }`}
-            >
-              <t.icon size={16} />
-              {t.label}
+        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+          {TABS.map(t => (
+            <button key={t.id} data-testid={`admin-tab-${t.id}`} onClick={() => setTab(t.id)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium rounded-lg transition-colors ${tab === t.id ? "bg-[var(--green-700)] text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]"}`}>
+              <t.icon size={15} />{t.label}
             </button>
           ))}
         </nav>
-
-        <div className="p-3 border-t border-[var(--border)]">
-          <button
-            data-testid="admin-logout-btn"
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium text-[var(--text-muted)] rounded-lg hover:bg-[var(--surface-alt)] transition-colors"
-          >
-            <LogOut size={16} />
-            Sair
+        <div className="p-2 border-t border-[var(--border)]">
+          <button data-testid="admin-logout-btn" onClick={async () => { await logout(); navigate("/admin/login"); }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-[var(--text-muted)] rounded-lg hover:bg-[var(--surface-alt)]">
+            <LogOut size={15} />Sair
           </button>
         </div>
       </aside>
-
-      {/* Main */}
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-6 overflow-y-auto max-h-screen">
+        {tab === "dashboard" && <DashboardTab />}
+        {tab === "homepage" && <HomepageTab />}
         {tab === "events" && <EventsTab />}
-        {tab === "gallery" && <GalleryTab />}
+        {tab === "services" && <ServicesTab />}
+        {tab === "timeline" && <TimelineTab />}
+        {tab === "messages" && <MessagesTab />}
         {tab === "members" && <MembersTab />}
-        {tab === "contacts" && <ContactsTab />}
+        {tab === "settings" && <SettingsTab />}
       </main>
     </div>
   );
 }
 
-// --- Events Tab ---
-function EventsTab() {
-  const [events, setEvents] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ title: "", description: "", date: "", time: "", location: "", price: "", image_url: "" });
+// ── Shared ─────────────────────────────────────────────────────────────
+const Inp = ({ label, value, onChange, type = "text", placeholder = "", testId, rows }) => (
+  <div>
+    <label className="block text-xs font-medium text-[var(--text-primary)] mb-1">{label}</label>
+    {rows ? (
+      <textarea data-testid={testId} rows={rows} value={value} onChange={e => onChange(e.target.value)}
+        className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] outline-none resize-none focus:border-[var(--green-700)]" placeholder={placeholder} />
+    ) : (
+      <input data-testid={testId} type={type} value={value} onChange={e => onChange(e.target.value)}
+        className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] outline-none focus:border-[var(--green-700)]" placeholder={placeholder} />
+    )}
+  </div>
+);
 
-  const fetchEvents = () => axios.get(`${API}/events`, { withCredentials: true }).then(r => setEvents(r.data));
-  useEffect(() => { fetchEvents(); }, []);
+const Btn = ({ children, onClick, variant = "primary", disabled, testId, className = "" }) => {
+  const base = "inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-all disabled:opacity-50";
+  const styles = { primary: "bg-[var(--green-700)] text-white hover:brightness-110", secondary: "border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-alt)]", danger: "bg-red-500 text-white hover:bg-red-600" };
+  return <button data-testid={testId} onClick={onClick} disabled={disabled} className={`${base} ${styles[variant]} ${className}`}>{children}</button>;
+};
 
-  const resetForm = () => {
-    setForm({ title: "", description: "", date: "", time: "", location: "", price: "", image_url: "" });
-    setEditingId(null);
-    setShowForm(false);
-  };
+const Card = ({ children, className = "" }) => <div className={`bg-white rounded-xl border border-[var(--border)] ${className}`}>{children}</div>;
 
-  const handleSave = async () => {
-    if (editingId) {
-      await axios.put(`${API}/events/${editingId}`, form, { withCredentials: true });
-    } else {
-      await axios.post(`${API}/events`, form, { withCredentials: true });
-    }
-    resetForm();
-    fetchEvents();
-  };
-
-  const handleEdit = (event) => {
-    setForm({ title: event.title, description: event.description, date: event.date, time: event.time || "", location: event.location || "", price: event.price || "", image_url: event.image_url || "" });
-    setEditingId(event.id);
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm("Tem a certeza que deseja eliminar este evento?")) {
-      await axios.delete(`${API}/events/${id}`, { withCredentials: true });
-      fetchEvents();
-    }
-  };
-
+// ── Dashboard ─────────────────────────────────────────────────────────
+function DashboardTab() {
+  const [s, setS] = useState(null);
+  useEffect(() => { ax.get("/admin/stats").then(r => setS(r.data)); }, []);
+  if (!s) return <div className="animate-pulse text-sm text-[var(--text-muted)]">A carregar...</div>;
+  const cards = [
+    { label: "Eventos Futuros", val: s.events.upcoming, total: s.events.total, icon: CalendarDays, color: "var(--green-700)" },
+    { label: "Mensagens Nao Lidas", val: s.messages.unread, total: s.messages.total, icon: MessageSquare, color: "#D97742" },
+    { label: "Socios Pendentes", val: s.members.pending, total: s.members.total, icon: UserPlus, color: "#6366f1" },
+    { label: "Servicos Ativos", val: s.services.total, total: null, icon: Briefcase, color: "#0891b2" },
+  ];
   return (
-    <div data-testid="admin-events-tab">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-medium" style={{ color: "var(--text-primary)" }}>
-          Gerir Eventos
-        </h1>
-        <button
-          data-testid="add-event-btn"
-          onClick={() => { resetForm(); setShowForm(true); }}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white"
-          style={{ backgroundColor: "var(--green-700)" }}
-        >
-          <Plus size={16} /> Novo Evento
-        </button>
-      </div>
-
-      {showForm && (
-        <div className="mb-8 p-6 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-          <h3 className="text-lg font-medium mb-4" style={{  }}>
-            {editingId ? "Editar Evento" : "Novo Evento"}
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <InputField label="Título *" value={form.title} onChange={v => setForm({...form, title: v})} testId="event-form-title" />
-            <InputField label="Data *" type="date" value={form.date} onChange={v => setForm({...form, date: v})} testId="event-form-date" />
-            <InputField label="Hora" value={form.time} onChange={v => setForm({...form, time: v})} testId="event-form-time" placeholder="ex: 21:00" />
-            <InputField label="Local" value={form.location} onChange={v => setForm({...form, location: v})} testId="event-form-location" />
-            <InputField label="Preço" value={form.price} onChange={v => setForm({...form, price: v})} testId="event-form-price" placeholder="ex: 12€" />
-            <InputField label="URL da Imagem" value={form.image_url} onChange={v => setForm({...form, image_url: v})} testId="event-form-image" />
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-primary)" }}>Descrição *</label>
-              <textarea
-                data-testid="event-form-description"
-                rows={3}
-                value={form.description}
-                onChange={e => setForm({...form, description: e.target.value})}
-                className="w-full px-3 py-2 text-sm border outline-none resize-none"
-                style={{ borderColor: "var(--border)" }}
-              />
+    <div data-testid="admin-dashboard-tab">
+      <h1 className="text-xl font-bold text-[var(--text-primary)] mb-6">Dashboard</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {cards.map(c => (
+          <Card key={c.label} className="p-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-2xl font-bold" style={{ color: c.color }}>{c.val}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">{c.label}</p>
+                {c.total !== null && <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{c.total} total</p>}
+              </div>
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: c.color + "15" }}>
+                <c.icon size={18} style={{ color: c.color }} />
+              </div>
             </div>
-          </div>
-          <div className="flex gap-3 mt-4">
-            <button
-              data-testid="event-form-save"
-              onClick={handleSave}
-              className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--green-700)" }}
-            >
-              <Save size={14} /> Guardar
-            </button>
-            <button
-              data-testid="event-form-cancel"
-              onClick={resetForm}
-              className="flex items-center gap-2 px-5 py-2 text-sm font-medium border"
-              style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-            >
-              <X size={14} /> Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {events.map(event => (
-          <div key={event.id} className="flex items-center justify-between p-4 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-            <div className="flex-1">
-              <h4 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{event.title}</h4>
-              <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>{event.date} {event.time && `| ${event.time}`} {event.location && `| ${event.location}`}</p>
-            </div>
-            <div className="flex gap-2">
-              <button data-testid={`edit-event-${event.id}`} onClick={() => handleEdit(event)} className="p-2 hover:opacity-70" style={{ color: "var(--green-700)" }}>
-                <Edit2 size={16} />
-              </button>
-              <button data-testid={`delete-event-${event.id}`} onClick={() => handleDelete(event.id)} className="p-2 hover:opacity-70 text-red-500">
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
+          </Card>
         ))}
       </div>
     </div>
   );
 }
 
-// --- Gallery Tab ---
-function GalleryTab() {
+// ── Homepage Content ──────────────────────────────────────────────────
+function HomepageTab() {
+  const [data, setData] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { ax.get("/content/homepage").then(r => setData(r.data)); }, []);
+
+  const save = async () => {
+    setSaving(true); setMsg("");
+    try { await ax.put("/content/homepage", data); setMsg("Guardado!"); setTimeout(() => setMsg(""), 2000); }
+    catch { setMsg("Erro ao guardar"); }
+    finally { setSaving(false); }
+  };
+
+  if (!data) return <div className="animate-pulse text-sm text-[var(--text-muted)]">A carregar...</div>;
+
+  return (
+    <div data-testid="admin-homepage-tab">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">Conteudo da Homepage</h1>
+        <div className="flex items-center gap-3">
+          {msg && <span className="text-sm text-[var(--green-700)] font-medium">{msg}</span>}
+          <Btn onClick={save} disabled={saving} testId="save-homepage"><Save size={14} />{saving ? "A guardar..." : "Guardar"}</Btn>
+        </div>
+      </div>
+      <div className="space-y-6">
+        <Card className="p-6">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Hero Section</h3>
+          <div className="space-y-3">
+            <Inp label="Badge (tag superior)" value={data.hero_badge || ""} onChange={v => setData({...data, hero_badge: v})} placeholder="Desde 1911..." />
+            <Inp label="Titulo Principal" value={data.hero_title || ""} onChange={v => setData({...data, hero_title: v})} />
+            <Inp label="Subtitulo" value={data.hero_subtitle || ""} onChange={v => setData({...data, hero_subtitle: v})} rows={2} />
+          </div>
+        </Card>
+        <Card className="p-6">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Seccao Sobre Nos</h3>
+          <div className="space-y-3">
+            <Inp label="Label" value={data.about_label || ""} onChange={v => setData({...data, about_label: v})} />
+            <Inp label="Titulo" value={data.about_title || ""} onChange={v => setData({...data, about_title: v})} />
+            <Inp label="Texto" value={data.about_text || ""} onChange={v => setData({...data, about_text: v})} rows={3} />
+          </div>
+        </Card>
+        <Card className="p-6">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Estatisticas</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {(data.stats || []).map((s, i) => (
+              <div key={i} className="p-3 border border-[var(--border)] rounded-lg space-y-2">
+                <Inp label="Valor" type="number" value={s.val} onChange={v => { const ns = [...data.stats]; ns[i] = {...ns[i], val: parseInt(v) || 0}; setData({...data, stats: ns}); }} />
+                <Inp label="Label" value={s.label} onChange={v => { const ns = [...data.stats]; ns[i] = {...ns[i], label: v}; setData({...data, stats: ns}); }} />
+                <Inp label="Sufixo" value={s.suffix} onChange={v => { const ns = [...data.stats]; ns[i] = {...ns[i], suffix: v}; setData({...data, stats: ns}); }} placeholder="ex: +" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ── CRUD Tab (generic for Events, Services, Timeline) ─────────────────
+function CRUDTab({ title, endpoint, fields, testPrefix }) {
   const [items, setItems] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", image_url: "", description: "", category: "" });
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState({});
 
-  const fetchGallery = () => axios.get(`${API}/gallery`, { withCredentials: true }).then(r => setItems(r.data));
-  useEffect(() => { fetchGallery(); }, []);
+  const fetch = useCallback(() => ax.get(endpoint).then(r => setItems(r.data)), [endpoint]);
+  useEffect(() => { fetch(); }, [fetch]);
 
-  const handleSave = async () => {
-    await axios.post(`${API}/gallery`, form, { withCredentials: true });
-    setForm({ title: "", image_url: "", description: "", category: "" });
-    setShowForm(false);
-    fetchGallery();
+  const emptyForm = () => fields.reduce((a, f) => ({ ...a, [f.key]: f.default || "" }), {});
+
+  const startNew = () => { setForm(emptyForm()); setEditId(null); setShowForm(true); };
+  const startEdit = (item) => { setForm(fields.reduce((a, f) => ({ ...a, [f.key]: item[f.key] ?? f.default ?? "" }), {})); setEditId(item.id); setShowForm(true); };
+  const cancel = () => { setShowForm(false); setEditId(null); };
+
+  const save = async () => {
+    if (editId) await ax.put(`${endpoint}/${editId}`, form);
+    else await ax.post(endpoint, form);
+    cancel(); fetch();
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Eliminar esta imagem?")) {
-      await axios.delete(`${API}/gallery/${id}`, { withCredentials: true });
-      fetchGallery();
-    }
+  const remove = async (id) => {
+    if (window.confirm("Tem a certeza?")) { await ax.delete(`${endpoint}/${id}`); fetch(); }
   };
 
   return (
-    <div data-testid="admin-gallery-tab">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-medium" style={{ color: "var(--text-primary)" }}>
-          Gerir Galeria
-        </h1>
-        <button
-          data-testid="add-gallery-btn"
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white"
-          style={{ backgroundColor: "var(--green-700)" }}
-        >
-          <Plus size={16} /> Nova Imagem
-        </button>
+    <div data-testid={`admin-${testPrefix}-tab`}>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">{title}</h1>
+        <Btn onClick={startNew} testId={`add-${testPrefix}-btn`}><Plus size={14} />Novo</Btn>
       </div>
 
       {showForm && (
-        <div className="mb-8 p-6 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <InputField label="Título *" value={form.title} onChange={v => setForm({...form, title: v})} testId="gallery-form-title" />
-            <InputField label="URL da Imagem *" value={form.image_url} onChange={v => setForm({...form, image_url: v})} testId="gallery-form-url" />
-            <InputField label="Descrição" value={form.description} onChange={v => setForm({...form, description: v})} testId="gallery-form-desc" />
-            <InputField label="Categoria" value={form.category} onChange={v => setForm({...form, category: v})} testId="gallery-form-category" placeholder="ex: Eventos, Teatro" />
+        <Card className="p-5 mb-5">
+          <h3 className="text-sm font-semibold mb-3">{editId ? "Editar" : "Novo"}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {fields.map(f => (
+              <div key={f.key} className={f.wide ? "sm:col-span-2" : ""}>
+                <Inp label={f.label} value={form[f.key] ?? ""} onChange={v => setForm({...form, [f.key]: f.type === "number" ? (parseInt(v) || 0) : v})}
+                  type={f.type || "text"} placeholder={f.placeholder || ""} rows={f.rows} testId={`${testPrefix}-form-${f.key}`} />
+              </div>
+            ))}
           </div>
-          <div className="flex gap-3 mt-4">
-            <button data-testid="gallery-form-save" onClick={handleSave} className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white" style={{ backgroundColor: "var(--green-700)" }}>
-              <Save size={14} /> Guardar
-            </button>
-            <button onClick={() => setShowForm(false)} className="flex items-center gap-2 px-5 py-2 text-sm font-medium border" style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}>
-              <X size={14} /> Cancelar
-            </button>
+          <div className="flex gap-2 mt-4">
+            <Btn onClick={save} testId={`${testPrefix}-form-save`}><Save size={14} />Guardar</Btn>
+            <Btn onClick={cancel} variant="secondary"><X size={14} />Cancelar</Btn>
           </div>
-        </div>
+        </Card>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="space-y-2">
         {items.map(item => (
-          <div key={item.id} className="border overflow-hidden" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
-            <img src={item.image_url} alt={item.title} className="w-full aspect-[4/3] object-cover" />
-            <div className="p-3 flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{item.title}</h4>
-                {item.category && <span className="text-xs" style={{ color: "var(--green-500)" }}>{item.category}</span>}
-              </div>
-              <button data-testid={`delete-gallery-${item.id}`} onClick={() => handleDelete(item.id)} className="p-2 hover:opacity-70 text-red-500">
-                <Trash2 size={16} />
-              </button>
+          <Card key={item.id} className="px-4 py-3 flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[var(--text-primary)] truncate">{item[fields[0].key]}</p>
+              <p className="text-xs text-[var(--text-muted)] truncate">{item[fields[1]?.key] || ""} {item.date ? `| ${item.date}` : ""}</p>
             </div>
-          </div>
+            <div className="flex gap-1 shrink-0">
+              <button onClick={() => startEdit(item)} className="p-1.5 rounded hover:bg-[var(--surface-alt)] text-[var(--green-700)]" data-testid={`edit-${testPrefix}-${item.id}`}><Edit2 size={14} /></button>
+              <button onClick={() => remove(item.id)} className="p-1.5 rounded hover:bg-red-50 text-red-500" data-testid={`delete-${testPrefix}-${item.id}`}><Trash2 size={14} /></button>
+            </div>
+          </Card>
         ))}
+        {items.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem registos.</p>}
       </div>
     </div>
   );
 }
 
-// --- Members Tab ---
+function EventsTab() {
+  return <CRUDTab title="Gerir Eventos" endpoint="/events" testPrefix="event" fields={[
+    { key: "title", label: "Titulo *", wide: false },
+    { key: "date", label: "Data *", type: "date" },
+    { key: "time", label: "Hora", placeholder: "ex: 21:00" },
+    { key: "location", label: "Local" },
+    { key: "price", label: "Preco", placeholder: "ex: 12 euros" },
+    { key: "image_url", label: "URL Imagem" },
+    { key: "description", label: "Descricao *", wide: true, rows: 3 },
+  ]} />;
+}
+
+function ServicesTab() {
+  return <CRUDTab title="Gerir Servicos" endpoint="/services" testPrefix="service" fields={[
+    { key: "title", label: "Titulo *" },
+    { key: "tag", label: "Categoria *", placeholder: "ex: Cultura, Desporto" },
+    { key: "image_url", label: "URL Imagem", wide: true },
+    { key: "note", label: "Nota / Destaque" },
+    { key: "order", label: "Ordem", type: "number", default: 0 },
+    { key: "description", label: "Descricao *", wide: true, rows: 3 },
+  ]} />;
+}
+
+function TimelineTab() {
+  return <CRUDTab title="Gerir Cronologia" endpoint="/timeline" testPrefix="timeline" fields={[
+    { key: "year", label: "Ano *", placeholder: "ex: 1911, 1950s" },
+    { key: "title", label: "Titulo *" },
+    { key: "order", label: "Ordem", type: "number", default: 0 },
+    { key: "description", label: "Descricao *", wide: true, rows: 3 },
+  ]} />;
+}
+
+// ── Messages ──────────────────────────────────────────────────────────
+function MessagesTab() {
+  const [msgs, setMsgs] = useState([]);
+  const [filter, setFilter] = useState("all");
+  const fetch = useCallback(() => ax.get("/contacts").then(r => setMsgs(r.data)), []);
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const shown = filter === "unread" ? msgs.filter(m => !m.read) : filter === "replied" ? msgs.filter(m => m.replied) : msgs;
+
+  const toggle = async (id, field, val) => { await ax.put(`/contacts/${id}`, { [field]: val }); fetch(); };
+  const remove = async (id) => { if (window.confirm("Apagar mensagem?")) { await ax.delete(`/contacts/${id}`); fetch(); } };
+
+  return (
+    <div data-testid="admin-messages-tab">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">Mensagens ({msgs.filter(m => !m.read).length} nao lidas)</h1>
+        <div className="flex gap-2">
+          {["all", "unread", "replied"].map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg ${filter === f ? "bg-[var(--green-700)] text-white" : "border border-[var(--border)] text-[var(--text-muted)]"}`}>
+              {f === "all" ? "Todas" : f === "unread" ? "Nao lidas" : "Respondidas"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-2">
+        {shown.map(m => (
+          <Card key={m.id} className={`p-4 ${!m.read ? "border-l-4 border-l-[var(--green-700)]" : ""}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{m.name}</p>
+                  <span className="text-[10px] text-[var(--text-muted)]">{m.email}</span>
+                  {!m.read && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--green-100)] text-[var(--green-700)]">NOVA</span>}
+                  {m.replied && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">RESPONDIDA</span>}
+                </div>
+                {m.subject && <p className="text-xs font-medium text-[var(--text-primary)] mb-1">{m.subject}</p>}
+                <p className="text-sm text-[var(--text-secondary)]">{m.message}</p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-2">{m.created_at ? new Date(m.created_at).toLocaleString("pt-PT") : ""}</p>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                {!m.read && <button title="Marcar como lida" onClick={() => toggle(m.id, "read", true)} className="p-1.5 rounded hover:bg-[var(--surface-alt)] text-[var(--green-700)]"><Eye size={14} /></button>}
+                {!m.replied && <button title="Marcar como respondida" onClick={() => toggle(m.id, "replied", true)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600"><Reply size={14} /></button>}
+                <a href={`mailto:${m.email}?subject=Re: ${m.subject || "Contacto SRDFSJL"}`} title="Responder por email" className="p-1.5 rounded hover:bg-[var(--surface-alt)] text-[var(--text-muted)]"><ExternalLink size={14} /></a>
+                <button onClick={() => remove(m.id)} className="p-1.5 rounded hover:bg-red-50 text-red-500"><Trash2 size={14} /></button>
+              </div>
+            </div>
+          </Card>
+        ))}
+        {shown.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem mensagens.</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── Members ───────────────────────────────────────────────────────────
 function MembersTab() {
   const [members, setMembers] = useState([]);
-  useEffect(() => {
-    axios.get(`${API}/members`, { withCredentials: true }).then(r => setMembers(r.data)).catch(() => {});
-  }, []);
+  const fetch = useCallback(() => ax.get("/members").then(r => setMembers(r.data)), []);
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const updateStatus = async (id, status) => { await ax.put(`/members/${id}/status`, { status }); fetch(); };
+
+  const statusColors = { pending: "bg-yellow-50 text-yellow-700", approved: "bg-green-50 text-[var(--green-700)]", rejected: "bg-red-50 text-red-600" };
+  const statusLabels = { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado" };
 
   return (
     <div data-testid="admin-members-tab">
-      <h1 className="text-2xl font-medium mb-8" style={{ color: "var(--text-primary)" }}>
-        Inscrições de Sócios
-      </h1>
-      {members.length > 0 ? (
-        <div className="space-y-3">
-          {members.map(m => (
-            <div key={m.id} className="p-4 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{m.full_name}</h4>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>{m.email} | {m.phone}</p>
-                  {m.address && <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{m.address}</p>}
-                  {m.message && <p className="text-xs mt-1 italic" style={{ color: "var(--text-secondary)" }}>"{m.message}"</p>}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">Inscricoes de Socios</h1>
+        <p className="text-xs text-[var(--text-muted)]">{members.filter(m => m.status === "pending").length} pendentes</p>
+      </div>
+      <div className="space-y-2">
+        {members.map(m => (
+          <Card key={m.id} className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{m.full_name}</p>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${statusColors[m.status] || ""}`}>{statusLabels[m.status] || m.status}</span>
                 </div>
-                <span className="text-xs px-2 py-1 font-medium" style={{ backgroundColor: "var(--green-500)", color: "white" }}>
-                  {m.status}
-                </span>
+                <p className="text-xs text-[var(--text-muted)]">{m.email} | {m.phone}</p>
+                {m.address && <p className="text-xs text-[var(--text-muted)]">{m.address}</p>}
+                {m.message && <p className="text-xs italic text-[var(--text-secondary)] mt-1">"{m.message}"</p>}
+              </div>
+              <div className="flex gap-1 shrink-0">
+                {m.status !== "approved" && (
+                  <button title="Aprovar" onClick={() => updateStatus(m.id, "approved")} className="p-1.5 rounded hover:bg-green-50 text-[var(--green-700)]"><Check size={14} /></button>
+                )}
+                {m.status !== "rejected" && (
+                  <button title="Rejeitar" onClick={() => updateStatus(m.id, "rejected")} className="p-1.5 rounded hover:bg-red-50 text-red-500"><X size={14} /></button>
+                )}
               </div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm py-12 text-center" style={{ color: "var(--text-secondary)" }}>Nenhuma inscrição recebida.</p>
-      )}
+          </Card>
+        ))}
+        {members.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem inscricoes.</p>}
+      </div>
     </div>
   );
 }
 
-// --- Contacts Tab ---
-function ContactsTab() {
-  const [contacts, setContacts] = useState([]);
-  useEffect(() => {
-    axios.get(`${API}/contacts`, { withCredentials: true }).then(r => setContacts(r.data)).catch(() => {});
-  }, []);
+// ── Settings ──────────────────────────────────────────────────────────
+function SettingsTab() {
+  const [data, setData] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { ax.get("/settings").then(r => setData(r.data)); }, []);
+
+  const save = async () => {
+    setSaving(true); setMsg("");
+    try { await ax.put("/settings", data); setMsg("Guardado!"); setTimeout(() => setMsg(""), 2000); }
+    catch { setMsg("Erro"); }
+    finally { setSaving(false); }
+  };
+
+  if (!data) return <div className="animate-pulse text-sm text-[var(--text-muted)]">A carregar...</div>;
 
   return (
-    <div data-testid="admin-contacts-tab">
-      <h1 className="text-2xl font-medium mb-8" style={{ color: "var(--text-primary)" }}>
-        Mensagens de Contacto
-      </h1>
-      {contacts.length > 0 ? (
-        <div className="space-y-3">
-          {contacts.map(c => (
-            <div key={c.id} className="p-4 border" style={{ backgroundColor: "var(--surface)", borderColor: "var(--border)" }}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{c.name}</h4>
-                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{c.email}</p>
-                  {c.subject && <p className="text-xs font-medium mt-1" style={{ color: "var(--text-primary)" }}>{c.subject}</p>}
-                  <p className="text-sm mt-2" style={{ color: "var(--text-secondary)" }}>{c.message}</p>
-                </div>
-                <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                  {c.created_at ? new Date(c.created_at).toLocaleDateString("pt-PT") : ""}
-                </span>
-              </div>
-            </div>
-          ))}
+    <div data-testid="admin-settings-tab">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">Definicoes do Site</h1>
+        <div className="flex items-center gap-3">
+          {msg && <span className="text-sm text-[var(--green-700)] font-medium">{msg}</span>}
+          <Btn onClick={save} disabled={saving} testId="save-settings"><Save size={14} />{saving ? "..." : "Guardar"}</Btn>
         </div>
-      ) : (
-        <p className="text-sm py-12 text-center" style={{ color: "var(--text-secondary)" }}>Nenhuma mensagem recebida.</p>
-      )}
-    </div>
-  );
-}
-
-// --- Input Field helper ---
-function InputField({ label, value, onChange, testId, type = "text", placeholder = "" }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-[var(--text-primary)] mb-1">{label}</label>
-      <input
-        type={type}
-        data-testid={testId}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] outline-none transition-all focus:border-[var(--green-700)]"
-        placeholder={placeholder}
-      />
+      </div>
+      <div className="space-y-5">
+        <Card className="p-6">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Informacoes Gerais</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Inp label="Nome da Sociedade" value={data.society_name || ""} onChange={v => setData({...data, society_name: v})} />
+            <Inp label="Ano de Fundacao" type="number" value={data.founding_year || ""} onChange={v => setData({...data, founding_year: parseInt(v) || 0})} />
+            <Inp label="Morada" value={data.address || ""} onChange={v => setData({...data, address: v})} />
+            <Inp label="Cidade" value={data.city || ""} onChange={v => setData({...data, city: v})} />
+            <Inp label="Email" value={data.email || ""} onChange={v => setData({...data, email: v})} />
+            <Inp label="Telefone" value={data.phone || ""} onChange={v => setData({...data, phone: v})} />
+          </div>
+        </Card>
+        <Card className="p-6">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Redes Sociais</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Inp label="Facebook URL" value={data.facebook_url || ""} onChange={v => setData({...data, facebook_url: v})} placeholder="https://facebook.com/..." />
+            <Inp label="Instagram URL" value={data.instagram_url || ""} onChange={v => setData({...data, instagram_url: v})} placeholder="https://instagram.com/..." />
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

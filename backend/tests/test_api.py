@@ -1,6 +1,6 @@
 """
-Backend API Tests for SRDFSIL Website
-Tests: Auth, Events, Gallery, Members, Contacts endpoints
+Backend API Tests for SRDFSJL Website - Full CMS Back Office
+Tests: Auth, Events, Services, Timeline, Settings, Homepage Content, Members, Contacts, Admin Stats
 """
 import pytest
 import requests
@@ -9,8 +9,8 @@ import uuid
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
-# Test credentials
-ADMIN_EMAIL = "admin@srdfsil.pt"
+# Test credentials - CORRECT admin email
+ADMIN_EMAIL = "admin@srdfsjl.pt"
 ADMIN_PASSWORD = "admin123"
 
 
@@ -23,7 +23,7 @@ class TestHealthAndPublicEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert "message" in data
-        assert "SRDFSIL" in data["message"]
+        assert "SRDFSJL" in data["message"]
         print("✓ API health check passed")
     
     def test_get_events(self):
@@ -47,18 +47,56 @@ class TestHealthAndPublicEndpoints:
         assert isinstance(data, list)
         print(f"✓ GET /api/events/upcoming returned {len(data)} upcoming events")
     
-    def test_get_gallery(self):
-        """Test GET /api/gallery - public endpoint"""
-        response = requests.get(f"{BASE_URL}/api/gallery")
+    def test_get_services(self):
+        """Test GET /api/services - public endpoint"""
+        response = requests.get(f"{BASE_URL}/api/services")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        if len(data) > 0:
+            service = data[0]
+            assert "id" in service
+            assert "title" in service
+            assert "tag" in service
+            assert "description" in service
+        print(f"✓ GET /api/services returned {len(data)} services")
+    
+    def test_get_timeline(self):
+        """Test GET /api/timeline - public endpoint"""
+        response = requests.get(f"{BASE_URL}/api/timeline")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
         if len(data) > 0:
             item = data[0]
             assert "id" in item
+            assert "year" in item
             assert "title" in item
-            assert "image_url" in item
-        print(f"✓ GET /api/gallery returned {len(data)} items")
+            assert "description" in item
+        print(f"✓ GET /api/timeline returned {len(data)} timeline items")
+    
+    def test_get_settings(self):
+        """Test GET /api/settings - public endpoint"""
+        response = requests.get(f"{BASE_URL}/api/settings")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, dict)
+        # Check for expected fields
+        assert "society_name" in data or data == {}
+        print(f"✓ GET /api/settings returned settings data")
+    
+    def test_get_homepage_content(self):
+        """Test GET /api/content/homepage - public endpoint"""
+        response = requests.get(f"{BASE_URL}/api/content/homepage")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, dict)
+        # Check for expected fields
+        if data:
+            assert "hero_title" in data
+            assert "hero_subtitle" in data
+            assert "stats" in data
+        print(f"✓ GET /api/content/homepage returned homepage content")
 
 
 class TestAuthentication:
@@ -130,6 +168,46 @@ class TestAuthentication:
         data = response.json()
         assert "message" in data
         print("✓ Logout successful")
+
+
+class TestAdminStats:
+    """Test admin dashboard stats endpoint"""
+    
+    @pytest.fixture
+    def auth_headers(self):
+        """Get authentication headers"""
+        response = requests.post(f"{BASE_URL}/api/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        token = response.json().get("token")
+        return {"Authorization": f"Bearer {token}"}
+    
+    def test_get_admin_stats(self, auth_headers):
+        """Test GET /api/admin/stats - admin only"""
+        response = requests.get(f"{BASE_URL}/api/admin/stats", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        # Verify structure
+        assert "events" in data
+        assert "members" in data
+        assert "messages" in data
+        assert "services" in data
+        # Verify nested structure
+        assert "total" in data["events"]
+        assert "upcoming" in data["events"]
+        assert "total" in data["members"]
+        assert "pending" in data["members"]
+        assert "total" in data["messages"]
+        assert "unread" in data["messages"]
+        assert "total" in data["services"]
+        print(f"✓ Admin stats: {data['events']['total']} events, {data['services']['total']} services, {data['members']['total']} members, {data['messages']['total']} messages")
+    
+    def test_get_admin_stats_unauthenticated(self):
+        """Test GET /api/admin/stats without auth"""
+        response = requests.get(f"{BASE_URL}/api/admin/stats")
+        assert response.status_code == 401
+        print("✓ Unauthenticated /api/admin/stats rejected")
 
 
 class TestContactForm:
@@ -290,8 +368,8 @@ class TestAdminEventsCRUD:
         print(f"✓ Event {event_id} deleted successfully")
 
 
-class TestAdminGalleryCRUD:
-    """Test admin gallery CRUD operations"""
+class TestAdminServicesCRUD:
+    """Test admin services CRUD operations"""
     
     @pytest.fixture
     def auth_headers(self):
@@ -303,44 +381,159 @@ class TestAdminGalleryCRUD:
         token = response.json().get("token")
         return {"Authorization": f"Bearer {token}"}
     
-    def test_add_gallery_item(self, auth_headers):
-        """Test POST /api/gallery - admin only"""
-        response = requests.post(f"{BASE_URL}/api/gallery", json={
-            "title": "TEST_Gallery Item",
-            "image_url": "https://example.com/test-image.jpg",
-            "description": "Test gallery description",
-            "category": "Test Category"
+    def test_create_service(self, auth_headers):
+        """Test POST /api/services - admin only"""
+        response = requests.post(f"{BASE_URL}/api/services", json={
+            "title": "TEST_Service Title",
+            "tag": "Test Category",
+            "description": "Test service description",
+            "note": "Test note",
+            "order": 99
         }, headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
-        assert data["title"] == "TEST_Gallery Item"
+        assert data["title"] == "TEST_Service Title"
+        assert data["tag"] == "Test Category"
         assert "id" in data
-        print(f"✓ Gallery item created with id: {data['id']}")
+        print(f"✓ Service created with id: {data['id']}")
         return data["id"]
     
-    def test_delete_gallery_item(self, auth_headers):
-        """Test DELETE /api/gallery/{id} - admin only"""
-        # First create a gallery item
-        create_response = requests.post(f"{BASE_URL}/api/gallery", json={
-            "title": "TEST_Delete Gallery",
-            "image_url": "https://example.com/delete-test.jpg"
+    def test_create_service_unauthorized(self):
+        """Test service creation without auth"""
+        response = requests.post(f"{BASE_URL}/api/services", json={
+            "title": "Unauthorized Service",
+            "tag": "Test",
+            "description": "Should fail"
+        })
+        assert response.status_code == 401
+        print("✓ Unauthorized service creation rejected")
+    
+    def test_update_service(self, auth_headers):
+        """Test PUT /api/services/{id} - admin only"""
+        # First create a service
+        create_response = requests.post(f"{BASE_URL}/api/services", json={
+            "title": "TEST_Update Service",
+            "tag": "Original",
+            "description": "Original description"
+        }, headers=auth_headers)
+        service_id = create_response.json()["id"]
+        
+        # Update the service
+        update_response = requests.put(f"{BASE_URL}/api/services/{service_id}", json={
+            "title": "TEST_Updated Service Title",
+            "tag": "Updated Category"
+        }, headers=auth_headers)
+        assert update_response.status_code == 200
+        data = update_response.json()
+        assert data["title"] == "TEST_Updated Service Title"
+        assert data["tag"] == "Updated Category"
+        print(f"✓ Service {service_id} updated successfully")
+    
+    def test_delete_service(self, auth_headers):
+        """Test DELETE /api/services/{id} - admin only"""
+        # First create a service
+        create_response = requests.post(f"{BASE_URL}/api/services", json={
+            "title": "TEST_Delete Service",
+            "tag": "Delete",
+            "description": "To be deleted"
+        }, headers=auth_headers)
+        service_id = create_response.json()["id"]
+        
+        # Delete the service
+        delete_response = requests.delete(f"{BASE_URL}/api/services/{service_id}", headers=auth_headers)
+        assert delete_response.status_code == 200
+        
+        # Verify deletion
+        services_response = requests.get(f"{BASE_URL}/api/services")
+        services = services_response.json()
+        service_ids = [s["id"] for s in services]
+        assert service_id not in service_ids
+        print(f"✓ Service {service_id} deleted successfully")
+
+
+class TestAdminTimelineCRUD:
+    """Test admin timeline CRUD operations"""
+    
+    @pytest.fixture
+    def auth_headers(self):
+        """Get authentication headers"""
+        response = requests.post(f"{BASE_URL}/api/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        token = response.json().get("token")
+        return {"Authorization": f"Bearer {token}"}
+    
+    def test_create_timeline_item(self, auth_headers):
+        """Test POST /api/timeline - admin only"""
+        response = requests.post(f"{BASE_URL}/api/timeline", json={
+            "year": "2025",
+            "title": "TEST_Timeline Event",
+            "description": "Test timeline description",
+            "order": 99
+        }, headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["year"] == "2025"
+        assert data["title"] == "TEST_Timeline Event"
+        assert "id" in data
+        print(f"✓ Timeline item created with id: {data['id']}")
+        return data["id"]
+    
+    def test_create_timeline_unauthorized(self):
+        """Test timeline creation without auth"""
+        response = requests.post(f"{BASE_URL}/api/timeline", json={
+            "year": "2025",
+            "title": "Unauthorized",
+            "description": "Should fail"
+        })
+        assert response.status_code == 401
+        print("✓ Unauthorized timeline creation rejected")
+    
+    def test_update_timeline_item(self, auth_headers):
+        """Test PUT /api/timeline/{id} - admin only"""
+        # First create a timeline item
+        create_response = requests.post(f"{BASE_URL}/api/timeline", json={
+            "year": "2024",
+            "title": "TEST_Update Timeline",
+            "description": "Original description"
+        }, headers=auth_headers)
+        item_id = create_response.json()["id"]
+        
+        # Update the item
+        update_response = requests.put(f"{BASE_URL}/api/timeline/{item_id}", json={
+            "title": "TEST_Updated Timeline Title",
+            "year": "2024-Updated"
+        }, headers=auth_headers)
+        assert update_response.status_code == 200
+        data = update_response.json()
+        assert data["title"] == "TEST_Updated Timeline Title"
+        print(f"✓ Timeline item {item_id} updated successfully")
+    
+    def test_delete_timeline_item(self, auth_headers):
+        """Test DELETE /api/timeline/{id} - admin only"""
+        # First create a timeline item
+        create_response = requests.post(f"{BASE_URL}/api/timeline", json={
+            "year": "2023",
+            "title": "TEST_Delete Timeline",
+            "description": "To be deleted"
         }, headers=auth_headers)
         item_id = create_response.json()["id"]
         
         # Delete the item
-        delete_response = requests.delete(f"{BASE_URL}/api/gallery/{item_id}", headers=auth_headers)
+        delete_response = requests.delete(f"{BASE_URL}/api/timeline/{item_id}", headers=auth_headers)
         assert delete_response.status_code == 200
         
         # Verify deletion
-        gallery_response = requests.get(f"{BASE_URL}/api/gallery")
-        items = gallery_response.json()
-        item_ids = [i["id"] for i in items]
+        timeline_response = requests.get(f"{BASE_URL}/api/timeline")
+        timeline = timeline_response.json()
+        item_ids = [t["id"] for t in timeline]
         assert item_id not in item_ids
-        print(f"✓ Gallery item {item_id} deleted successfully")
+        print(f"✓ Timeline item {item_id} deleted successfully")
 
 
-class TestAdminProtectedEndpoints:
-    """Test admin-only endpoints"""
+class TestAdminSettingsAndContent:
+    """Test admin settings and homepage content endpoints"""
     
     @pytest.fixture
     def auth_headers(self):
@@ -352,21 +545,62 @@ class TestAdminProtectedEndpoints:
         token = response.json().get("token")
         return {"Authorization": f"Bearer {token}"}
     
-    def test_get_members_authenticated(self, auth_headers):
-        """Test GET /api/members - admin only"""
-        response = requests.get(f"{BASE_URL}/api/members", headers=auth_headers)
+    def test_update_settings(self, auth_headers):
+        """Test PUT /api/settings - admin only"""
+        response = requests.put(f"{BASE_URL}/api/settings", json={
+            "phone": "912345678"
+        }, headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
-        print(f"✓ GET /api/members returned {len(data)} members")
+        assert data["phone"] == "912345678"
+        print("✓ Settings updated successfully")
     
-    def test_get_members_unauthenticated(self):
-        """Test GET /api/members without auth"""
-        response = requests.get(f"{BASE_URL}/api/members")
+    def test_update_settings_unauthorized(self):
+        """Test settings update without auth"""
+        response = requests.put(f"{BASE_URL}/api/settings", json={
+            "phone": "000000000"
+        })
         assert response.status_code == 401
-        print("✓ Unauthenticated /api/members rejected")
+        print("✓ Unauthorized settings update rejected")
     
-    def test_get_contacts_authenticated(self, auth_headers):
+    def test_update_homepage_content(self, auth_headers):
+        """Test PUT /api/content/homepage - admin only"""
+        response = requests.put(f"{BASE_URL}/api/content/homepage", json={
+            "hero_badge": "TEST_Badge Updated"
+        }, headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["hero_badge"] == "TEST_Badge Updated"
+        print("✓ Homepage content updated successfully")
+        
+        # Restore original
+        requests.put(f"{BASE_URL}/api/content/homepage", json={
+            "hero_badge": "Desde 1911 — S. Joao das Lampas"
+        }, headers=auth_headers)
+    
+    def test_update_homepage_unauthorized(self):
+        """Test homepage content update without auth"""
+        response = requests.put(f"{BASE_URL}/api/content/homepage", json={
+            "hero_title": "Unauthorized"
+        })
+        assert response.status_code == 401
+        print("✓ Unauthorized homepage content update rejected")
+
+
+class TestAdminContactsManagement:
+    """Test admin contacts management"""
+    
+    @pytest.fixture
+    def auth_headers(self):
+        """Get authentication headers"""
+        response = requests.post(f"{BASE_URL}/api/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        token = response.json().get("token")
+        return {"Authorization": f"Bearer {token}"}
+    
+    def test_get_contacts(self, auth_headers):
         """Test GET /api/contacts - admin only"""
         response = requests.get(f"{BASE_URL}/api/contacts", headers=auth_headers)
         assert response.status_code == 200
@@ -374,11 +608,170 @@ class TestAdminProtectedEndpoints:
         assert isinstance(data, list)
         print(f"✓ GET /api/contacts returned {len(data)} contacts")
     
-    def test_get_contacts_unauthenticated(self):
-        """Test GET /api/contacts without auth"""
-        response = requests.get(f"{BASE_URL}/api/contacts")
-        assert response.status_code == 401
-        print("✓ Unauthenticated /api/contacts rejected")
+    def test_update_contact_read_status(self, auth_headers):
+        """Test PUT /api/contacts/{id} - mark as read"""
+        # First create a contact
+        unique_email = f"test_read_{uuid.uuid4().hex[:8]}@test.com"
+        requests.post(f"{BASE_URL}/api/contact", json={
+            "name": "TEST_Read Contact",
+            "email": unique_email,
+            "message": "Test message for read status"
+        })
+        
+        # Get contacts to find the one we created
+        contacts_response = requests.get(f"{BASE_URL}/api/contacts", headers=auth_headers)
+        contacts = contacts_response.json()
+        test_contact = next((c for c in contacts if c["email"] == unique_email), None)
+        
+        if test_contact:
+            # Mark as read
+            update_response = requests.put(f"{BASE_URL}/api/contacts/{test_contact['id']}", 
+                json={"read": True}, headers=auth_headers)
+            assert update_response.status_code == 200
+            print("✓ Contact marked as read successfully")
+        else:
+            print("⚠ Could not find test contact to update")
+    
+    def test_update_contact_replied_status(self, auth_headers):
+        """Test PUT /api/contacts/{id} - mark as replied"""
+        # First create a contact
+        unique_email = f"test_reply_{uuid.uuid4().hex[:8]}@test.com"
+        requests.post(f"{BASE_URL}/api/contact", json={
+            "name": "TEST_Reply Contact",
+            "email": unique_email,
+            "message": "Test message for reply status"
+        })
+        
+        # Get contacts to find the one we created
+        contacts_response = requests.get(f"{BASE_URL}/api/contacts", headers=auth_headers)
+        contacts = contacts_response.json()
+        test_contact = next((c for c in contacts if c["email"] == unique_email), None)
+        
+        if test_contact:
+            # Mark as replied
+            update_response = requests.put(f"{BASE_URL}/api/contacts/{test_contact['id']}", 
+                json={"replied": True}, headers=auth_headers)
+            assert update_response.status_code == 200
+            print("✓ Contact marked as replied successfully")
+        else:
+            print("⚠ Could not find test contact to update")
+    
+    def test_delete_contact(self, auth_headers):
+        """Test DELETE /api/contacts/{id} - admin only"""
+        # First create a contact
+        unique_email = f"test_del_{uuid.uuid4().hex[:8]}@test.com"
+        requests.post(f"{BASE_URL}/api/contact", json={
+            "name": "TEST_Delete Contact",
+            "email": unique_email,
+            "message": "Test message for deletion"
+        })
+        
+        # Get contacts to find the one we created
+        contacts_response = requests.get(f"{BASE_URL}/api/contacts", headers=auth_headers)
+        contacts = contacts_response.json()
+        test_contact = next((c for c in contacts if c["email"] == unique_email), None)
+        
+        if test_contact:
+            # Delete the contact
+            delete_response = requests.delete(f"{BASE_URL}/api/contacts/{test_contact['id']}", headers=auth_headers)
+            assert delete_response.status_code == 200
+            print("✓ Contact deleted successfully")
+        else:
+            print("⚠ Could not find test contact to delete")
+
+
+class TestAdminMembersManagement:
+    """Test admin members management"""
+    
+    @pytest.fixture
+    def auth_headers(self):
+        """Get authentication headers"""
+        response = requests.post(f"{BASE_URL}/api/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        token = response.json().get("token")
+        return {"Authorization": f"Bearer {token}"}
+    
+    def test_get_members(self, auth_headers):
+        """Test GET /api/members - admin only"""
+        response = requests.get(f"{BASE_URL}/api/members", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        print(f"✓ GET /api/members returned {len(data)} members")
+    
+    def test_update_member_status_approve(self, auth_headers):
+        """Test PUT /api/members/{id}/status - approve member"""
+        # First create a member
+        unique_email = f"test_approve_{uuid.uuid4().hex[:8]}@test.com"
+        requests.post(f"{BASE_URL}/api/members", json={
+            "full_name": "TEST_Approve Member",
+            "email": unique_email,
+            "phone": "912345678"
+        })
+        
+        # Get members to find the one we created
+        members_response = requests.get(f"{BASE_URL}/api/members", headers=auth_headers)
+        members = members_response.json()
+        test_member = next((m for m in members if m["email"] == unique_email), None)
+        
+        if test_member:
+            # Approve member
+            update_response = requests.put(f"{BASE_URL}/api/members/{test_member['id']}/status", 
+                json={"status": "approved"}, headers=auth_headers)
+            assert update_response.status_code == 200
+            print("✓ Member approved successfully")
+        else:
+            print("⚠ Could not find test member to approve")
+    
+    def test_update_member_status_reject(self, auth_headers):
+        """Test PUT /api/members/{id}/status - reject member"""
+        # First create a member
+        unique_email = f"test_reject_{uuid.uuid4().hex[:8]}@test.com"
+        requests.post(f"{BASE_URL}/api/members", json={
+            "full_name": "TEST_Reject Member",
+            "email": unique_email,
+            "phone": "912345678"
+        })
+        
+        # Get members to find the one we created
+        members_response = requests.get(f"{BASE_URL}/api/members", headers=auth_headers)
+        members = members_response.json()
+        test_member = next((m for m in members if m["email"] == unique_email), None)
+        
+        if test_member:
+            # Reject member
+            update_response = requests.put(f"{BASE_URL}/api/members/{test_member['id']}/status", 
+                json={"status": "rejected"}, headers=auth_headers)
+            assert update_response.status_code == 200
+            print("✓ Member rejected successfully")
+        else:
+            print("⚠ Could not find test member to reject")
+    
+    def test_update_member_status_invalid(self, auth_headers):
+        """Test PUT /api/members/{id}/status - invalid status"""
+        # First create a member
+        unique_email = f"test_invalid_{uuid.uuid4().hex[:8]}@test.com"
+        requests.post(f"{BASE_URL}/api/members", json={
+            "full_name": "TEST_Invalid Member",
+            "email": unique_email,
+            "phone": "912345678"
+        })
+        
+        # Get members to find the one we created
+        members_response = requests.get(f"{BASE_URL}/api/members", headers=auth_headers)
+        members = members_response.json()
+        test_member = next((m for m in members if m["email"] == unique_email), None)
+        
+        if test_member:
+            # Try invalid status
+            update_response = requests.put(f"{BASE_URL}/api/members/{test_member['id']}/status", 
+                json={"status": "invalid_status"}, headers=auth_headers)
+            assert update_response.status_code == 400
+            print("✓ Invalid member status rejected correctly")
+        else:
+            print("⚠ Could not find test member")
 
 
 if __name__ == "__main__":

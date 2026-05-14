@@ -9,7 +9,6 @@ const NAV = [
   { to: "/historia", label: "Historia" },
   { to: "/eventos", label: "Eventos" },
   { to: "/servicos", label: "Servicos" },
-  { to: "/galeria", label: "Galeria" },
   { to: "/contactos", label: "Contactos" },
 ];
 
@@ -35,23 +34,30 @@ function Header() {
   return (
     <header data-testid="main-header" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${headerBg}`}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
-        <div className="flex items-center justify-between h-[72px]">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-3" data-testid="logo-link">
+        <div className="flex items-center gap-4 justify-between h-[92px] sm:h-[100px] lg:h-[108px]">
+          {/* Logo + nome */}
+          <Link
+            to="/"
+            className="flex items-center gap-3 min-w-0 flex-1"
+            data-testid="logo-link"
+          >
             <img
               src={LOGO}
               alt="SRDFSJL"
-              className={`object-contain transition-all duration-300 ${scrolled ? "w-9 h-9" : "w-14 h-14"}`}
+              className={`shrink-0 object-contain transition-all duration-300 w-[56px] h-[56px] sm:w-[66px] sm:h-[66px] lg:w-[76px] lg:h-[76px] ${
+                scrolled ? "opacity-95" : "opacity-100"
+              }`}
             />
-            {scrolled && (
-              <span className={`text-[13px] font-semibold tracking-tight hidden sm:block transition-colors whitespace-nowrap ${textColor}`}>
-                Sociedade Recreativa Desportiva de Familiar de S. João das Lampas
-              </span>
-            )}
+
+            <span
+              className={`min-w-0 max-w-[360px] xl:max-w-[520px] text-[15px] sm:text-[16px] lg:text-[17px] font-semibold tracking-tight leading-tight whitespace-normal break-words hidden sm:block transition-colors ${textColor}`}
+            >
+              Sociedade Recreativa Desportiva de Familiar de <br />São João das Lampas
+            </span>
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-1" data-testid="desktop-nav">
+          <nav className="hidden lg:flex items-center gap-1 shrink-0" data-testid="desktop-nav">
             {NAV.map(n => (
               <Link
                 key={n.to}
@@ -140,30 +146,26 @@ function Footer() {
       <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
           {/* Brand */}
-          <div className="md:col-span-5">
+          <div className="md:col-span-6 ">
             <div className="flex items-center gap-3 mb-4">
-              <img src={LOGO} alt="SRDFSJL" className="w-9 h-9 object-contain" />
+              <img src={LOGO} alt="SRDFSJL" className="w-12 h-12 object-contain" />
               <span className="text-sm font-semibold tracking-tight">SRDFSJL</span>
             </div>
-            <p className="text-sm text-white/50 leading-relaxed max-w-xs">
-              Sociedade Recreativa Desportiva e Familiar de S. Joao das Lampas. 
-              Ao servico da comunidade desde 1911.
-            </p>
+            <div className="text-sm text-white/50 leading-relaxed max-w-xs">
+              <p>Sociedade Recreativa Desportiva e Familiar de São Joao das Lampas.</p>
+              <p>Ao servico da comunidade desde 1911.</p>
+            </div>
           </div>
 
           {/* Links */}
-          <div className="md:col-span-3">
-            <p className="text-xs font-semibold tracking-widest uppercase text-white/30 mb-4">Paginas</p>
-            <div className="space-y-2.5">
-              {NAV.map(n => (
-                <Link key={n.to} to={n.to} className="block text-sm text-white/50 hover:text-white transition-colors">{n.label}</Link>
-              ))}
-            </div>
+          <div className="md:col-span-2">
+
+
           </div>
 
           {/* Contact */}
           <div className="md:col-span-4">
-            <p className="text-xs font-semibold tracking-widest uppercase text-white/30 mb-4">Contacto</p>
+            <p className="text-xs font-semibold tracking-widest uppercase text-white/100 mb-4">Contacto</p>
             <div className="space-y-2.5 text-sm text-white/50">
               <p>Avenida Central 24</p>
               <p>S. Joao das Lampas, Sintra</p>
@@ -172,11 +174,6 @@ function Footer() {
               </a>
             </div>
           </div>
-        </div>
-
-        <div className="mt-12 pt-6 border-t border-white/8 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-white/25">
-          <p>&copy; {new Date().getFullYear()} SRDFSJL. Todos os direitos reservados.</p>
-          <Link to="/admin/login" className="hover:text-white/50 transition-colors">Admin</Link>
         </div>
       </div>
     </footer>
