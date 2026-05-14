@@ -505,7 +505,7 @@ function MembersTab({ showToast }) {
   }, []);
   useEffect(() => { fetchMembers(); fetchSocios(); }, [fetchMembers, fetchSocios]);
 
-  const emptyForm = () => ({ cr56f_numerosocio: "", cr56f_nome: "", cr56f_estado: "", cr56f_datadenascimento: "", cr56f_telemovel: "", cr56f_email: "", cr56f_arruamento: "", cr56f_nporta: "", cr56f_codigopostal: "", cr56f_localidade: "", cr56f_datadeinscricao: new Date().toISOString().split("T")[0], cr56f_observacoes: "" });
+  const emptyForm = () => ({ cr56f_registrationnumber: "", cr56f_fullname: "", cr56f_estadosocio: "", cr56f_dateofbirth: "", cr56f_phonenumber: "", cr56f_email: "", cr56f_arruamento: "", cr56f_nporta: "", cr56f_postalcode: "", cr56f_city: "", cr56f_registrationyear: new Date().toISOString().split("T")[0], cr56f_observations: "" });
   const startNew = () => { setForm(emptyForm()); setEditId(null); setShowForm(true); };
   const startEdit = (s) => { const f = {}; Object.keys(emptyForm()).forEach(k => { f[k] = s[k] ?? ""; }); setEditId(s[Object.keys(s).find(k => k.endsWith("id") && k.startsWith("cr56f_"))] || ""); setForm(f); setShowForm(true); };
   const cancel = () => { setShowForm(false); setEditId(null); };
@@ -516,14 +516,14 @@ function MembersTab({ showToast }) {
     finally { setSaving(false); }
   };
   const updateMemberStatus = async (id, status) => { await ax.put(`/members/${id}/status`, { status }); fetchMembers(); showToast("Estado atualizado!"); };
-  const filtered = socios.filter(s => { if (!search) return true; const q = search.toLowerCase(); return (s.cr56f_nome || "").toLowerCase().includes(q) || (s.cr56f_email || "").toLowerCase().includes(q) || String(s.cr56f_numerosocio || "").includes(q); });
+  const filtered = socios.filter(s => { if (!search) return true; const q = search.toLowerCase(); return (s.cr56f_fullname || "").toLowerCase().includes(q) || (s.cr56f_email || "").toLowerCase().includes(q) || String(s.cr56f_registrationnumber || "").includes(q); });
   const statusColors = { pending: "bg-yellow-50 text-yellow-700", approved: "bg-green-50 text-[var(--green-700)]", rejected: "bg-red-50 text-red-600" };
   const statusLabels = { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado" };
   const FIELDS = [
-    { key: "cr56f_numerosocio", label: "Num. Socio" }, { key: "cr56f_nome", label: "Nome *", w: true }, { key: "cr56f_estado", label: "Estado" },
-    { key: "cr56f_datadenascimento", label: "Data Nasc.", type: "date" }, { key: "cr56f_telemovel", label: "Telemovel" }, { key: "cr56f_email", label: "Email" },
-    { key: "cr56f_arruamento", label: "Arruamento", w: true }, { key: "cr56f_nporta", label: "Num. Porta" }, { key: "cr56f_codigopostal", label: "Cod. Postal" },
-    { key: "cr56f_localidade", label: "Localidade" }, { key: "cr56f_datadeinscricao", label: "Data Inscricao", type: "date" }, { key: "cr56f_observacoes", label: "Observacoes", w: true, rows: 2 },
+    { key: "cr56f_registrationnumber", label: "Num. Socio" }, { key: "cr56f_fullname", label: "Nome *", w: true }, { key: "cr56f_estadosocio", label: "Estado" },
+    { key: "cr56f_dateofbirth", label: "Data Nasc.", type: "date" }, { key: "cr56f_phonenumber", label: "Telemovel" }, { key: "cr56f_email", label: "Email" },
+    { key: "cr56f_arruamento", label: "Arruamento", w: true }, { key: "cr56f_nporta", label: "Num. Porta" }, { key: "cr56f_postalcode", label: "Cod. Postal" },
+    { key: "cr56f_city", label: "Localidade" }, { key: "cr56f_registrationyear", label: "Data Inscricao", type: "date" }, { key: "cr56f_observations", label: "Observacoes", w: true, rows: 2 },
   ];
 
   return (
@@ -575,12 +575,12 @@ function MembersTab({ showToast }) {
                 <tbody className="divide-y divide-gray-50">
                   {filtered.map((s, i) => (
                     <tr key={i} className="hover:bg-gray-50/50 transition-colors group">
-                      <td className="py-3.5 px-5 font-semibold text-gray-700">{s.cr56f_numerosocio || "-"}</td>
-                      <td className="py-3.5 px-5 text-gray-700">{s.cr56f_nome || "-"}</td>
-                      <td className="py-3.5 px-5"><span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[var(--green-100)] text-[var(--green-700)]">{s.cr56f_estado || "-"}</span></td>
-                      <td className="py-3.5 px-5 text-gray-400">{s.cr56f_telemovel || "-"}</td>
+                      <td className="py-3.5 px-5 font-semibold text-gray-700">{s.cr56f_registrationnumber || "-"}</td>
+                      <td className="py-3.5 px-5 text-gray-700">{s.cr56f_fullname || "-"}</td>
+                      <td className="py-3.5 px-5"><span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[var(--green-100)] text-[var(--green-700)]">{s.cr56f_estadosocio || "-"}</span></td>
+                      <td className="py-3.5 px-5 text-gray-400">{s.cr56f_phonenumber || "-"}</td>
                       <td className="py-3.5 px-5 text-gray-400">{s.cr56f_email || "-"}</td>
-                      <td className="py-3.5 px-5 text-gray-400">{s.cr56f_localidade || "-"}</td>
+                      <td className="py-3.5 px-5 text-gray-400">{s.cr56f_city || "-"}</td>
                       <td className="py-3.5 px-5"><button onClick={() => startEdit(s)} className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--green-100)] text-[var(--green-700)] transition-all"><Edit2 size={14} /></button></td>
                     </tr>
                   ))}
