@@ -346,6 +346,7 @@ function MessagesTab() {
 // ── Members ───────────────────────────────────────────────────────────
 function MembersTab() {
   const [members, setMembers] = useState([]);
+  const [view, setView] = useState("powerapps");
   const fetch = useCallback(() => ax.get("/members").then(r => setMembers(r.data)), []);
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -354,38 +355,73 @@ function MembersTab() {
   const statusColors = { pending: "bg-yellow-50 text-yellow-700", approved: "bg-green-50 text-[var(--green-700)]", rejected: "bg-red-50 text-red-600" };
   const statusLabels = { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado" };
 
+  const POWERAPPS_URL = "https://apps.powerapps.com/play/e/c87e1463-5eeb-e3c8-8032-5f6e3c326746/a/7b9b82df-3396-4df8-9a25-25cf0ac9cee9?tenantId=14f905ae-d65a-49d7-8cff-54892cba6e7f&source=iframe";
+
   return (
     <div data-testid="admin-members-tab">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Inscricoes de Socios</h1>
-        <p className="text-xs text-[var(--text-muted)]">{members.filter(m => m.status === "pending").length} pendentes</p>
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">Gestao de Socios</h1>
+        <div className="flex gap-2">
+          <button onClick={() => setView("powerapps")}
+            className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${view === "powerapps" ? "bg-[var(--green-700)] text-white" : "border border-[var(--border)] text-[var(--text-muted)]"}`}
+            data-testid="members-view-powerapps">
+            PowerApps
+          </button>
+          <button onClick={() => setView("inscricoes")}
+            className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${view === "inscricoes" ? "bg-[var(--green-700)] text-white" : "border border-[var(--border)] text-[var(--text-muted)]"}`}
+            data-testid="members-view-inscricoes">
+            Inscricoes Website ({members.filter(m => m.status === "pending").length} pendentes)
+          </button>
+        </div>
       </div>
-      <div className="space-y-2">
-        {members.map(m => (
-          <Card key={m.id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{m.full_name}</p>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${statusColors[m.status] || ""}`}>{statusLabels[m.status] || m.status}</span>
+
+      {view === "powerapps" ? (
+        <Card className="overflow-hidden">
+          <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
+            <p className="text-sm font-medium text-[var(--text-primary)]">Microsoft PowerApps — Gestao de Socios</p>
+            <a href={POWERAPPS_URL} target="_blank" rel="noopener noreferrer"
+              className="text-xs font-medium text-[var(--green-700)] hover:underline flex items-center gap-1" data-testid="powerapps-open-new">
+              Abrir em nova janela <ExternalLink size={12} />
+            </a>
+          </div>
+          <iframe
+            src={POWERAPPS_URL}
+            title="PowerApps - Gestao de Socios"
+            className="w-full border-0"
+            style={{ height: "calc(100vh - 220px)", minHeight: "500px" }}
+            allow="geolocation; microphone; camera"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+            data-testid="powerapps-iframe"
+          />
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {members.map(m => (
+            <Card key={m.id} className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{m.full_name}</p>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${statusColors[m.status] || ""}`}>{statusLabels[m.status] || m.status}</span>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">{m.email} | {m.phone}</p>
+                  {m.address && <p className="text-xs text-[var(--text-muted)]">{m.address}</p>}
+                  {m.message && <p className="text-xs italic text-[var(--text-secondary)] mt-1">"{m.message}"</p>}
                 </div>
-                <p className="text-xs text-[var(--text-muted)]">{m.email} | {m.phone}</p>
-                {m.address && <p className="text-xs text-[var(--text-muted)]">{m.address}</p>}
-                {m.message && <p className="text-xs italic text-[var(--text-secondary)] mt-1">"{m.message}"</p>}
+                <div className="flex gap-1 shrink-0">
+                  {m.status !== "approved" && (
+                    <button title="Aprovar" onClick={() => updateStatus(m.id, "approved")} className="p-1.5 rounded hover:bg-green-50 text-[var(--green-700)]"><Check size={14} /></button>
+                  )}
+                  {m.status !== "rejected" && (
+                    <button title="Rejeitar" onClick={() => updateStatus(m.id, "rejected")} className="p-1.5 rounded hover:bg-red-50 text-red-500"><X size={14} /></button>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-1 shrink-0">
-                {m.status !== "approved" && (
-                  <button title="Aprovar" onClick={() => updateStatus(m.id, "approved")} className="p-1.5 rounded hover:bg-green-50 text-[var(--green-700)]"><Check size={14} /></button>
-                )}
-                {m.status !== "rejected" && (
-                  <button title="Rejeitar" onClick={() => updateStatus(m.id, "rejected")} className="p-1.5 rounded hover:bg-red-50 text-red-500"><X size={14} /></button>
-                )}
-              </div>
-            </div>
-          </Card>
-        ))}
-        {members.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem inscricoes.</p>}
-      </div>
+            </Card>
+          ))}
+          {members.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-10">Sem inscricoes.</p>}
+        </div>
+      )}
     </div>
   );
 }
