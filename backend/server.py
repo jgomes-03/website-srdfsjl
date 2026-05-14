@@ -446,7 +446,90 @@ async def update_member_status(member_id: str, request: Request):
     result = await db.members.update_one({"id": member_id}, {"$set": {"status": status}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
+
+    # If approved, create in Dataverse
+    if status == "approved" and DATAVERSE_URL and AZURE_CLIENT_ID:
+        member = await db.members.find_one({"id": member_id}, {"_id": 0})
+        if member:
+            try:
+                dv_data = {
+                    "cr56f_fullname": member.get("full_name", ""),
+                    "cr56f_email": member.get("email", ""),
+                    "cr56f_phonenumber": member.get("phone", ""),
+                    "cr56f_city": member.get("address", ""),
+                    "cr56f_observations": member.get("message", ""),
+                    "cr56f_registrationyear": datetime.now(timezone.utc).year,
+                }
+                await dataverse_request("POST", DATAVERSE_TABLE, json_data=dv_data)
+                await db.members.update_one({"id": member_id}, {"$set": {"synced_to_dataverse": True}})
+                logger.info(f"Member {member_id} synced to Dataverse")
+            except Exception as e:
+                logger.error(f"Failed to sync member to Dataverse: {e}")
+
     return {"message": "Updated"}
+
+# ── Reports ──────────────────────────────────────────────────────────────
+@api_router.get("/admin/reports")
+async def get_reports(request: Request):
+    await require_admin(request)
+    current_year = datetime.now(timezone.utc).year
+
+    # Get all socios and payments from Dataverse
+    try:
+        socios_result = await dataverse_request("GET", f"{DATAVERSE_TABLE}?$top=1000&$select=cr56f_registrationnumber,cr56f_fullname,cr56f_email,cr56f_phonenumber,cr56f_estadosocio,cr56f_city")
+        socios = socios_result.get("value", [])
+
+        payments_result = await dataverse_request("GET", "cr56f_paymentsrecords?$top=5000&$select=cr56f_membershipid,cr56f_membershipyear,cr56f_paymentamount,cr56f_paymentdate,cr56f_paymentmethod")
+        all_payments = payments_result.get("value", [])
+    except Exception:
+        return {"error": "Dataverse nao acessivel", "quotas_em_atraso": [], "revenue_by_year": {}, "total_socios": 0, "payment_stats": {}}
+
+    # Members with paid current year
+    paid_this_year = set()
+    revenue_by_year = {}
+    method_counts = {}
+    for p in all_payments:
+        mid = str(p.get("cr56f_membershipid", ""))
+        year = p.get("cr56f_membershipyear")
+        amount = p.get("cr56f_paymentamount", 0) or 0
+        method = p.get("cr56f_paymentmethod")
+
+        if year == current_year and mid:
+            paid_this_year.add(mid)
+
+        y_str = str(year) if year else "?"
+        revenue_by_year[y_str] = revenue_by_year.get(y_str, 0) + float(amount)
+
+        m_label = {1: "Numerario", 2: "Transferencia", 3: "MBWay", 4: "Multibanco"}.get(method, "Outro")
+        method_counts[m_label] = method_counts.get(m_label, 0) + 1
+
+    # Quotas em atraso
+    em_atraso = []
+    for s in socios:
+        regnum = str(s.get("cr56f_registrationnumber", ""))
+        if regnum and regnum not in paid_this_year:
+            em_atraso.append({
+                "registrationnumber": regnum,
+                "fullname": s.get("cr56f_fullname", ""),
+                "email": s.get("cr56f_email", ""),
+                "phone": s.get("cr56f_phonenumber", ""),
+                "estado": s.get("cr56f_estadosocio", ""),
+                "city": s.get("cr56f_city", ""),
+            })
+
+    # Sort revenue by year desc
+    revenue_sorted = dict(sorted(revenue_by_year.items(), key=lambda x: x[0], reverse=True))
+
+    return {
+        "current_year": current_year,
+        "total_socios": len(socios),
+        "total_payments": len(all_payments),
+        "paid_this_year": len(paid_this_year),
+        "quotas_em_atraso": em_atraso,
+        "quotas_em_atraso_count": len(em_atraso),
+        "revenue_by_year": revenue_sorted,
+        "payment_methods": method_counts,
+    }
 
 # ── Contact ──────────────────────────────────────────────────────────────
 @api_router.post("/contact")
@@ -489,7 +572,7 @@ async def delete_contact(msg_id: str, request: Request):
 @api_router.get("/dataverse/socios")
 async def get_dataverse_socios(request: Request):
     await require_admin(request)
-    result = await dataverse_request("GET", f"{DATAVERSE_TABLE}?$top=500&$orderby=createdon desc")
+    result = await dataverse_request("GET", f"{DATAVERSE_TABLE}?$top=1000&$orderby=cr56f_registrationnumber asc")
     return result.get("value", [])
 
 @api_router.post("/dataverse/socios")

@@ -5,7 +5,7 @@ import {
   LogOut, LayoutDashboard, Calendar, Briefcase, Clock as ClockIcon, Mail, Settings, Users,
   Plus, Trash2, Edit2, Save, X, Check, Eye, Reply, ExternalLink, Search,
   TrendingUp, MessageSquare, UserPlus, CalendarDays, ChevronRight, Bell, Home,
-  ChevronDown, CreditCard, Receipt, ArrowLeft,
+  ChevronDown, CreditCard, Receipt, ArrowLeft, BarChart3, AlertTriangle, UserCheck, UserX, Send,
 } from "lucide-react";
 import axios from "axios";
 
@@ -43,6 +43,7 @@ export default function AdminDashboard() {
     { id: "timeline", label: "Cronologia", icon: ClockIcon },
     { id: "messages", label: "Mensagens", icon: Mail, badge: true },
     { id: "members", label: "Socios", icon: Users },
+    { id: "reports", label: "Relatorios", icon: BarChart3 },
     { id: "settings", label: "Definicoes", icon: Settings },
   ];
 
@@ -115,6 +116,7 @@ export default function AdminDashboard() {
           {tab === "timeline" && <TimelineTab showToast={showToast} />}
           {tab === "messages" && <MessagesTab showToast={showToast} />}
           {tab === "members" && <MembersTab showToast={showToast} />}
+          {tab === "reports" && <ReportsTab />}
           {tab === "settings" && <SettingsTab showToast={showToast} />}
         </main>
       </div>
@@ -517,7 +519,7 @@ function MembersTab({ showToast }) {
     finally { setSaving(false); }
   };
   const updateMemberStatus = async (id, status) => { await ax.put(`/members/${id}/status`, { status }); fetchMembers(); showToast("Atualizado!"); };
-  const filtered = socios.filter(s => { if (!search) return true; const q = search.toLowerCase(); return (s.cr56f_fullname || "").toLowerCase().includes(q) || (s.cr56f_email || "").toLowerCase().includes(q) || String(s.cr56f_registrationnumber || "").includes(q); });
+  const filtered = socios.filter(s => { if (!search) return true; const q = search.toLowerCase(); return (s.cr56f_fullname || "").toLowerCase().includes(q) || (s.cr56f_email || "").toLowerCase().includes(q) || String(s.cr56f_registrationnumber || "").includes(q) || (s.cr56f_phonenumber || "").includes(q); });
   const stColors = { pending: "bg-yellow-50 text-yellow-700", approved: "bg-green-50 text-[var(--green-700)]", rejected: "bg-red-50 text-red-600" };
   const stLabels = { pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado" };
   const FIELDS = [
@@ -571,15 +573,33 @@ function MembersTab({ showToast }) {
           ) : <Card className="p-12 text-center"><p className="text-sm text-gray-300">Configure o Dataverse.</p></Card>}
         </div>
       ) : (
-        <Card className="overflow-hidden"><div className="divide-y divide-gray-50">{members.map(m => (
-          <div key={m.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50/50 group">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500">{(m.full_name||"?")[0].toUpperCase()}</div>
-            <div className="flex-1 min-w-0"><div className="flex items-center gap-2"><p className="text-sm font-semibold text-gray-700">{m.full_name}</p><span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${stColors[m.status]}`}>{stLabels[m.status]}</span></div><p className="text-xs text-gray-400">{m.email} · {m.phone}</p></div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {m.status !== "approved" && <button onClick={() => updateMemberStatus(m.id, "approved")} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-green-50 text-[var(--green-700)]"><Check size={14} /></button>}
-              {m.status !== "rejected" && <button onClick={() => updateMemberStatus(m.id, "rejected")} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 text-red-400"><X size={14} /></button>}
-            </div></div>
-        ))}{members.length === 0 && <p className="text-sm text-gray-300 text-center py-12">Sem inscricoes.</p>}</div></Card>
+        <Card className="overflow-hidden"><div className="divide-y divide-gray-50">{members.length > 0 ? members.map(m => (
+          <div key={m.id} className={`px-6 py-5 hover:bg-gray-50/50 transition-colors ${m.status === "pending" ? "bg-amber-50/30" : ""}`}>
+            <div className="flex items-start gap-4">
+              <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${m.status === "approved" ? "bg-green-100 text-[var(--green-700)]" : m.status === "rejected" ? "bg-red-100 text-red-500" : "bg-amber-100 text-amber-600"}`}>{(m.full_name||"?")[0].toUpperCase()}</div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm font-semibold text-gray-700">{m.full_name}</p>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${stColors[m.status]}`}>{stLabels[m.status]}</span>
+                  {m.synced_to_dataverse && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-500">DATAVERSE</span>}
+                </div>
+                <p className="text-xs text-gray-400">{m.email} · {m.phone}</p>
+                {m.address && <p className="text-xs text-gray-400">{m.address}</p>}
+                {m.message && <p className="text-xs italic text-gray-400 mt-1">"{m.message}"</p>}
+                <p className="text-[10px] text-gray-300 mt-1">{m.created_at ? new Date(m.created_at).toLocaleString("pt-PT") : ""}</p>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                {m.status === "pending" && (
+                  <>
+                    <button onClick={() => updateMemberStatus(m.id, "approved")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--green-100)] text-[var(--green-700)] hover:bg-[var(--green-700)] hover:text-white transition-all" title="Aprovar e criar no Dataverse"><UserCheck size={13} />Aprovar</button>
+                    <button onClick={() => updateMemberStatus(m.id, "rejected")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all"><UserX size={13} />Rejeitar</button>
+                  </>
+                )}
+                {m.status === "approved" && !m.synced_to_dataverse && <span className="text-[10px] text-amber-500">Sync pendente</span>}
+              </div>
+            </div>
+          </div>
+        )) : <p className="text-sm text-gray-300 text-center py-12">Sem inscricoes.</p>}</div></Card>
       )}
     </div>
   );
@@ -675,6 +695,118 @@ function SocioDetail({ socio, onBack, showToast }) {
     </div>
   );
 }
+
+
+// ── Reports ───────────────────────────────────────────────────────────
+function ReportsTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [atrasoSearch, setAtrasoSearch] = useState("");
+
+  useEffect(() => {
+    ax.get("/admin/reports").then(r => { setData(r.data); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin" /></div>;
+  if (!data || data.error) return <Card className="p-8 text-center"><AlertTriangle size={32} className="mx-auto text-amber-400 mb-3" /><p className="text-sm text-gray-500">{data?.error || "Erro ao carregar relatorios."}</p></Card>;
+
+  const filteredAtraso = (data.quotas_em_atraso || []).filter(s => {
+    if (!atrasoSearch) return true;
+    const q = atrasoSearch.toLowerCase();
+    return (s.fullname || "").toLowerCase().includes(q) || (s.email || "").toLowerCase().includes(q) || String(s.registrationnumber || "").includes(q) || (s.phone || "").includes(q);
+  });
+
+  const revenueYears = Object.entries(data.revenue_by_year || {}).slice(0, 8);
+  const maxRevenue = Math.max(...revenueYears.map(([, v]) => v), 1);
+
+  return (
+    <div data-testid="admin-reports-tab" className="space-y-8">
+      <p className="text-sm text-gray-400">Visao geral financeira e de quotas.</p>
+
+      {/* Top stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {[
+          { label: "Total Socios", val: data.total_socios, icon: Users, color: "#0d6b4f", bg: "#E6F5EF" },
+          { label: `Quotas Pagas ${data.current_year}`, val: data.paid_this_year, icon: Check, color: "#15B377", bg: "#E6F5EF" },
+          { label: "Quotas em Atraso", val: data.quotas_em_atraso_count, icon: AlertTriangle, color: "#D97742", bg: "#FEF3E8" },
+          { label: "Total Pagamentos", val: data.total_payments, icon: CreditCard, color: "#6366f1", bg: "#EEF2FF" },
+        ].map(c => (
+          <Card key={c.label} className="p-6">
+            <div className="flex items-start justify-between mb-3">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: c.bg }}><c.icon size={20} style={{ color: c.color }} /></div>
+            </div>
+            <p className="text-3xl font-bold text-gray-800">{c.val}</p>
+            <p className="text-xs text-gray-400 mt-1">{c.label}</p>
+          </Card>
+        ))}
+      </div>
+
+      {/* Revenue by year + Payment methods */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <Card className="p-6 lg:col-span-2">
+          <h3 className="text-sm font-bold text-gray-700 mb-5">Receita por Ano (EUR)</h3>
+          <div className="space-y-3">
+            {revenueYears.map(([year, val]) => (
+              <div key={year} className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-gray-500 w-12">{year}</span>
+                <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden relative">
+                  <div className="h-full rounded-lg transition-all duration-500" style={{ width: `${(val / maxRevenue) * 100}%`, backgroundColor: "var(--green-700)" }} />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-600">{val.toFixed(0)} EUR</span>
+                </div>
+              </div>
+            ))}
+            {revenueYears.length === 0 && <p className="text-sm text-gray-300">Sem dados.</p>}
+          </div>
+        </Card>
+        <Card className="p-6">
+          <h3 className="text-sm font-bold text-gray-700 mb-5">Metodos de Pagamento</h3>
+          <div className="space-y-3">
+            {Object.entries(data.payment_methods || {}).sort((a, b) => b[1] - a[1]).map(([method, count]) => (
+              <div key={method} className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">{method}</span>
+                <span className="text-sm font-bold text-gray-700">{count}</span>
+              </div>
+            ))}
+            {Object.keys(data.payment_methods || {}).length === 0 && <p className="text-sm text-gray-300">Sem dados.</p>}
+          </div>
+        </Card>
+      </div>
+
+      {/* Quotas em atraso */}
+      <div>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-bold text-gray-700 flex items-center gap-2"><AlertTriangle size={18} className="text-amber-500" /> Quotas em Atraso - {data.current_year} ({data.quotas_em_atraso_count} socios)</h3>
+          <div className="relative w-64">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+            <input type="text" placeholder="Pesquisar..." value={atrasoSearch} onChange={e => setAtrasoSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-gray-200 outline-none focus:border-[var(--green-700)]" data-testid="atraso-search" />
+          </div>
+        </div>
+        <Card className="overflow-hidden">
+          <table className="w-full text-sm" data-testid="atraso-table">
+            <thead><tr className="bg-amber-50/50">
+              {["Num.", "Nome", "Email", "Telemovel", "Localidade", "Estado"].map(h => (<th key={h} className="py-3 px-5 text-left font-semibold text-xs text-gray-400 uppercase tracking-wider">{h}</th>))}
+            </tr></thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredAtraso.slice(0, 100).map((s, i) => (
+                <tr key={i} className="hover:bg-amber-50/30 transition-colors">
+                  <td className="py-3 px-5 font-semibold text-gray-700">{s.registrationnumber}</td>
+                  <td className="py-3 px-5 text-gray-700">{s.fullname || "-"}</td>
+                  <td className="py-3 px-5 text-gray-400">{s.email || "-"}</td>
+                  <td className="py-3 px-5 text-gray-400">{s.phone || "-"}</td>
+                  <td className="py-3 px-5 text-gray-400">{s.city || "-"}</td>
+                  <td className="py-3 px-5"><span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700">{s.estado || "-"}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filteredAtraso.length === 0 && <p className="text-sm text-gray-300 text-center py-10">Nenhum socio com quota em atraso.</p>}
+          {filteredAtraso.length > 100 && <div className="px-5 py-3 border-t border-gray-50 text-xs text-gray-300">A mostrar 100 de {filteredAtraso.length}</div>}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 
 // ── Settings ──────────────────────────────────────────────────────────
 function SettingsTab({ showToast }) {
