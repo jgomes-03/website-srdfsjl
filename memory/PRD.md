@@ -1,42 +1,47 @@
-# SRDFSIL Website - PRD
+# SRDFSJL Website - PRD
 
 ## Problema Original
-Website para a Sociedade Recreativa Desportiva e Familiar de São João das Lampas (SRDFSIL), baseado no esboço em https://socipilot.ct.ws.
+Website + CMS completo para a Sociedade Recreativa Desportiva e Familiar de São João das Lampas.
 
 ## Arquitetura
 - **Frontend**: React 19 + Tailwind CSS + React Router v7
-- **Backend**: FastAPI (Python) com Motor (async MongoDB)
+- **Backend**: FastAPI + Motor (async MongoDB)
 - **Database**: MongoDB
-- **Auth**: JWT com httpOnly cookies
+- **Auth**: JWT httpOnly cookies
 
-## O que foi implementado
+## Iteração 4 - Back Office Completo (14/05/2026)
+Aplicadas alterações do GitHub do utilizador + CMS completo:
 
-### Iteracao 1 - MVP (09/05/2026)
-- Backend completo (auth, eventos CRUD, galeria, socios, contacto)
-- Frontend 8 paginas
-- Testes: 100%
+### Alterações do utilizador (GitHub merge):
+- Removida Galeria (página + nav + rotas)
+- CountUp animation nos stats da homepage
+- Header maior com logo + nome sempre visível
+- Footer simplificado
+- Título da página alterado
+- Removido badge "Made with Emergent"
 
-### Iteracao 2 - Redesign Visual (09/05/2026)
-- Logo real SRDFSIL + imagem 112 anos
-- Header glassmorphism, scroll reveal animations
-- Testes: 100%
+### Back Office (8 tabs):
+1. **Dashboard** - 4 cards estatísticas (eventos, mensagens, sócios, serviços)
+2. **Homepage** - Editor: hero (badge, título, subtítulo), secção About, estatísticas editáveis
+3. **Eventos** - CRUD completo
+4. **Serviços** - CRUD com título, tag, imagem, nota, ordem, descrição
+5. **Cronologia** - CRUD timeline (ano, título, descrição, ordem)
+6. **Mensagens** - Ver/marcar lida/respondida/apagar + filtros
+7. **Sócios** - Ver inscrições, aprovar/rejeitar
+8. **Definições** - Nome, morada, cidade, email, telefone, Facebook, Instagram
 
-### Iteracao 3 - Redesign Moderno (09/05/2026)
-- **Tipografia**: DM Sans (body) + Sora (headings) - moderno e geometrico
-- **Cores**: Paleta verde puro (#0B3D2E, #0d6b4f, #15B377, #E6F5EF) - sem laranja
-- **Estrutura**: Header fixo com transparencia na homepage, hero left-aligned
-- **Logos**: Apenas no header (40px) e footer (36px) - sem redundancia
-- **Cards**: Limpos com bordas subtis e icones verdes
-- **Formularios**: Inputs com rounded-lg e focus states verdes
-- Testes: 100%
+### Páginas públicas dinâmicas:
+- Homepage lê conteúdo da API (/api/content/homepage + /api/services)
+- Serviços lê da API (/api/services)
+- História lê da API (/api/timeline)
+
+### Testes: 42/42 backend, 100% frontend
 
 ## Backlog
 ### P1
-- Upload de imagens direto no admin
-- Edicao de conteudo das paginas pelo admin
+- Integração PowerApps para gestão de sócios
+- Upload direto de imagens
 
 ### P2
-- Newsletter para socios
-- Calendario visual mensal
-- Area de socio com login proprio
-- Integrcao com Facebook
+- Newsletter para sócios
+- Área de sócio com login
