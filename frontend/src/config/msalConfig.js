@@ -7,7 +7,7 @@ export const msalConfig = {
   auth: {
     clientId: CLIENT_ID,
     authority: TENANT_ID ? `https://login.microsoftonline.com/${TENANT_ID}` : "https://login.microsoftonline.com/common",
-    redirectUri: window.location.origin,
+    redirectUri: `${window.location.origin}/admin/login`,
     postLogoutRedirectUri: window.location.origin,
     navigateToLoginRequestUrl: false,
   },
@@ -28,7 +28,6 @@ export const loginRequest = {
 
 export const msalInstance = new PublicClientApplication(msalConfig);
 
-// Initialize MSAL immediately
 let msalInitPromise = null;
 export const ensureMsalInitialized = () => {
   if (!msalInitPromise) {

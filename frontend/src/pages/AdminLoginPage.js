@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { msalInstance, loginRequest, isMicrosoftConfigured, ensureMsalInitialized } from "@/config/msalConfig";
@@ -10,52 +10,57 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [showBypass, setShowBypass] = useState(false);
   const [msalReady, setMsalReady] = useState(false);
   const { login, loginWithMicrosoft } = useAuth();
   const navigate = useNavigate();
+  const redirectHandled = useRef(false);
 
-  // Initialize MSAL on mount
+  // Handle return from Microsoft redirect on mount
   useEffect(() => {
-    if (isMicrosoftConfigured()) {
-      ensureMsalInitialized()
-        .then(() => setMsalReady(true))
-        .catch((err) => console.error("MSAL init error:", err));
-    }
-  }, []);
+    if (!isMicrosoftConfigured() || redirectHandled.current) return;
+    redirectHandled.current = true;
+
+    const processRedirect = async () => {
+      try {
+        await ensureMsalInitialized();
+        setMsalReady(true);
+        const result = await msalInstance.handleRedirectPromise();
+
+        if (result && (result.idToken || result.accessToken)) {
+          setValidating(true);
+          try {
+            await loginWithMicrosoft(result.idToken, result.accessToken);
+            navigate("/admin");
+          } catch (err) {
+            // Validation failed (not in group / wrong domain) -> logout + homepage
+            console.error("Microsoft validation failed:", err?.response?.data?.detail || err.message);
+            await msalInstance.logoutRedirect({
+              account: result.account,
+              postLogoutRedirectUri: window.location.origin,
+            });
+          }
+        }
+      } catch (err) {
+        console.error("MSAL redirect error:", err);
+        setError(err?.errorMessage || "Erro no login Microsoft");
+        setValidating(false);
+      }
+    };
+
+    processRedirect();
+  }, [loginWithMicrosoft, navigate]);
 
   const handleMicrosoftLogin = async () => {
     setLoading(true);
     setError("");
     try {
       await ensureMsalInitialized();
-      const result = await msalInstance.loginPopup(loginRequest);
-
-      console.log("MSAL result - idToken:", !!result.idToken, "accessToken:", !!result.accessToken);
-
-      if (!result.idToken && !result.accessToken) {
-        setError("Token nao recebido do Microsoft. Tente novamente.");
-        return;
-      }
-
-      // Send both idToken (user claims) and accessToken (for MS Graph fallback)
-      await loginWithMicrosoft(result.idToken, result.accessToken);
-      navigate("/admin");
+      await msalInstance.loginRedirect(loginRequest);
     } catch (err) {
       console.error("Microsoft login error:", err);
-
-      // Don't show error if user cancelled the popup
-      if (err?.errorCode === "user_cancelled" || err?.name === "BrowserAuthError") {
-        setLoading(false);
-        return;
-      }
-
-      const msg = err?.response?.data?.detail
-        || err?.errorMessage
-        || err?.message
-        || "Erro no login Microsoft";
-      setError(typeof msg === "string" ? msg : JSON.stringify(msg));
-    } finally {
+      setError(err?.errorMessage || err?.message || "Erro no login Microsoft");
       setLoading(false);
     }
   };
@@ -77,6 +82,19 @@ export default function AdminLoginPage() {
 
   const inp = "w-full px-4 py-3 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg)] outline-none transition-all focus:border-[var(--green-700)] focus:ring-2 focus:ring-[var(--green-700)]/10";
   const msConfigured = isMicrosoftConfigured();
+
+  if (validating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-5 bg-[var(--bg)]">
+        <div className="text-center" data-testid="sso-validating">
+          <img src={LOGO} alt="SRDFSJL" className="w-14 h-14 mx-auto mb-5 object-contain animate-pulse" />
+          <div className="w-8 h-8 mx-auto mb-4 border-2 border-[var(--green-700)] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-medium text-[var(--text-primary)]">A validar acesso...</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">A verificar permissoes da sua conta</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-5 bg-[var(--bg)]">
@@ -101,7 +119,7 @@ export default function AdminLoginPage() {
           className="w-full flex items-center justify-center gap-3 py-3.5 text-sm font-semibold rounded-lg transition-all hover:shadow-md disabled:opacity-50 border border-[var(--border)] bg-white text-[var(--text-primary)] hover:bg-[var(--surface-alt)]"
         >
           <svg width="18" height="18" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
-          {loading ? "A entrar..." : !msalReady && msConfigured ? "A preparar..." : "Entrar com Microsoft"}
+          {loading ? "A redirecionar..." : !msalReady && msConfigured ? "A preparar..." : "Entrar com Microsoft"}
         </button>
 
         {!msConfigured && (

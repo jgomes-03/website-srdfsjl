@@ -168,7 +168,7 @@ AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID", "")
 AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "")
 DATAVERSE_URL = os.environ.get("DATAVERSE_URL", "")
 DATAVERSE_TABLE = os.environ.get("DATAVERSE_TABLE_NAME", "cr56f_sociosv2s")
-REQUIRED_GROUP_NAME = "Orgaos Sociais"
+REQUIRED_GROUP_ID = os.environ.get("AZURE_REQUIRED_GROUP_ID", "442fb52b-5d77-4553-9f8e-3a99bf688403")
 
 _dataverse_token_cache = {"token": None, "expires": None}
 _graph_token_cache = {"token": None, "expires": None}
@@ -199,24 +199,24 @@ async def get_graph_token() -> str:
     return await _get_cc_token("https://graph.microsoft.com/.default", _graph_token_cache)
 
 async def check_user_in_group(user_email: str) -> bool:
-    """Check if user belongs to 'Orgaos Sociais' group via MS Graph."""
+    """Check if user belongs to the required group (by object id) via MS Graph."""
     try:
         token = await get_graph_token()
         headers = {"Authorization": f"Bearer {token}"}
         async with httpx.AsyncClient() as c:
-            r = await c.get(f"https://graph.microsoft.com/v1.0/users/{user_email}/memberOf?$select=displayName",
+            r = await c.get(f"https://graph.microsoft.com/v1.0/users/{user_email}/memberOf?$select=id,displayName",
                 headers=headers, timeout=15)
             if r.status_code != 200:
                 logger.error(f"Graph memberOf error for {user_email}: {r.status_code} {r.text[:200]}")
                 return False
             groups = r.json().get("value", [])
             for g in groups:
-                gname = g.get("displayName", "")
-                logger.info(f"  User group: {gname}")
-                if gname.strip().lower() == REQUIRED_GROUP_NAME.strip().lower():
-                    logger.info(f"  -> MATCH: user is in '{REQUIRED_GROUP_NAME}'")
+                gid = (g.get("id") or "").lower()
+                logger.info(f"  User group: {g.get('displayName')} ({gid})")
+                if gid == REQUIRED_GROUP_ID.lower():
+                    logger.info(f"  -> MATCH: user is in group {REQUIRED_GROUP_ID}")
                     return True
-            logger.warning(f"User {user_email} not in group '{REQUIRED_GROUP_NAME}'. Groups: {[g.get('displayName') for g in groups]}")
+            logger.warning(f"User {user_email} not in group {REQUIRED_GROUP_ID}. Groups: {[(g.get('displayName'), g.get('id')) for g in groups]}")
             return False
     except HTTPException:
         raise
@@ -287,11 +287,11 @@ async def microsoft_login(request: Request, response: Response, body: MicrosoftL
         logger.warning(f"Microsoft login - tenant rejected: {tid}")
         raise HTTPException(status_code=403, detail="Tenant nao autorizado")
 
-    # 5. Check group membership - user must be in "Orgaos Sociais"
-    logger.info(f"Microsoft login - checking group '{REQUIRED_GROUP_NAME}' for {email}")
+    # 5. Check group membership by group object id
+    logger.info(f"Microsoft login - checking group {REQUIRED_GROUP_ID} for {email}")
     in_group = await check_user_in_group(email)
     if not in_group:
-        raise HTTPException(status_code=403, detail=f"O utilizador nao pertence ao grupo '{REQUIRED_GROUP_NAME}'. Contacte o administrador.")
+        raise HTTPException(status_code=403, detail="O utilizador nao pertence ao grupo autorizado. Contacte o administrador.")
 
     # 6. Find or create user in MongoDB
     user = await db.users.find_one({"email": email})

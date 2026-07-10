@@ -37,6 +37,20 @@ Aplicadas alterações do GitHub do utilizador + CMS completo:
 
 ### Testes: 42/42 backend, 100% frontend
 
+## Iteração 5-6 - Dataverse + SSO Microsoft
+- Integração Dataverse: sócios (`cr56f_sociosv2s`, 327 registos) e pagamentos (`cr56f_paymentsrecords`)
+- Aprovação de inscrições sincroniza com Dataverse
+- Dashboard SaaS redesign + tab Relatórios
+- SSO Microsoft (Entra ID) com MSAL
+
+## Iteração 7 - SSO Redirect Flow (10/06/2026)
+- Substituído `loginPopup` por `loginRedirect` (tudo na mesma página)
+- `redirectUri` = `{origin}/admin/login` — **tem de estar registado no Azure App Registration (SPA)**
+- Validação de grupo agora por **Object ID**: `442fb52b-5d77-4553-9f8e-3a99bf688403` (env `AZURE_REQUIRED_GROUP_ID`)
+- Fluxo: SSO → redirect Microsoft → regresso a /admin/login → backend valida domínio + grupo via Graph → cria user se não existir → /admin
+- Se validação falhar: `logoutRedirect` MSAL → homepage
+- Requer permissão Graph `GroupMember.Read.All` (Application) concedida no tenant
+
 ## Backlog
 ### P1
 - Integração PowerApps para gestão de sócios
