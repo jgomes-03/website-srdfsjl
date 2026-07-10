@@ -31,19 +31,15 @@ export default function AdminLoginPage() {
       await ensureMsalInitialized();
       const result = await msalInstance.loginPopup(loginRequest);
 
-      console.log("MSAL result keys:", Object.keys(result));
-      console.log("Has idToken:", !!result.idToken);
-      console.log("Has accessToken:", !!result.accessToken);
+      console.log("MSAL result - idToken:", !!result.idToken, "accessToken:", !!result.accessToken);
 
-      // Use idToken (has user claims) - accessToken is for MS Graph API and may be opaque
-      const tokenToSend = result.idToken || result.accessToken;
-
-      if (!tokenToSend) {
+      if (!result.idToken && !result.accessToken) {
         setError("Token nao recebido do Microsoft. Tente novamente.");
         return;
       }
 
-      await loginWithMicrosoft(tokenToSend);
+      // Send both idToken (user claims) and accessToken (for MS Graph fallback)
+      await loginWithMicrosoft(result.idToken, result.accessToken);
       navigate("/admin");
     } catch (err) {
       console.error("Microsoft login error:", err);

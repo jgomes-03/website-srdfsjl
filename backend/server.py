@@ -159,37 +159,70 @@ class ContactMessage(BaseModel):
     message: str
 
 class MicrosoftLoginRequest(BaseModel):
-    access_token: str
+    id_token: str
+    access_token: Optional[str] = ""
 
 # ── Azure AD / Dataverse Config ──────────────────────────────────────────
 AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID", "")
 AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID", "")
 AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "")
 DATAVERSE_URL = os.environ.get("DATAVERSE_URL", "")
-DATAVERSE_TABLE = os.environ.get("DATAVERSE_TABLE_NAME", "cr_socios")
+DATAVERSE_TABLE = os.environ.get("DATAVERSE_TABLE_NAME", "cr56f_sociosv2s")
+REQUIRED_GROUP_NAME = "Orgaos Sociais"
 
 _dataverse_token_cache = {"token": None, "expires": None}
+_graph_token_cache = {"token": None, "expires": None}
+
+async def _get_cc_token(scope: str, cache: dict) -> str:
+    now = datetime.now(timezone.utc)
+    if cache["token"] and cache["expires"] and cache["expires"] > now:
+        return cache["token"]
+    if not AZURE_TENANT_ID or not AZURE_CLIENT_ID or not AZURE_CLIENT_SECRET:
+        raise HTTPException(status_code=503, detail="Azure not configured")
+    async with httpx.AsyncClient() as c:
+        r = await c.post(f"https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/token",
+            data={"grant_type": "client_credentials", "client_id": AZURE_CLIENT_ID, "client_secret": AZURE_CLIENT_SECRET, "scope": scope}, timeout=15)
+        if r.status_code != 200:
+            logger.error(f"Token error ({scope}): {r.text[:200]}")
+            raise HTTPException(status_code=502, detail="Failed to get token")
+        d = r.json()
+        cache["token"] = d["access_token"]
+        cache["expires"] = now + timedelta(seconds=d.get("expires_in", 3600) - 300)
+        return d["access_token"]
 
 async def get_dataverse_token() -> str:
-    """Get Dataverse access token via client credentials flow."""
-    now = datetime.now(timezone.utc)
-    if _dataverse_token_cache["token"] and _dataverse_token_cache["expires"] and _dataverse_token_cache["expires"] > now:
-        return _dataverse_token_cache["token"]
-    if not AZURE_TENANT_ID or not AZURE_CLIENT_ID or not AZURE_CLIENT_SECRET or not DATAVERSE_URL:
-        raise HTTPException(status_code=503, detail="Azure/Dataverse not configured")
-    async with httpx.AsyncClient() as client:
-        r = await client.post(
-            f"https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/token",
-            data={"grant_type": "client_credentials", "client_id": AZURE_CLIENT_ID, "client_secret": AZURE_CLIENT_SECRET, "scope": f"{DATAVERSE_URL}/.default"},
-            timeout=15,
-        )
-        if r.status_code != 200:
-            logger.error(f"Dataverse token error: {r.text}")
-            raise HTTPException(status_code=502, detail="Failed to get Dataverse token")
-        data = r.json()
-        _dataverse_token_cache["token"] = data["access_token"]
-        _dataverse_token_cache["expires"] = now + timedelta(seconds=data.get("expires_in", 3600) - 300)
-        return data["access_token"]
+    if not DATAVERSE_URL:
+        raise HTTPException(status_code=503, detail="Dataverse URL not configured")
+    return await _get_cc_token(f"{DATAVERSE_URL}/.default", _dataverse_token_cache)
+
+async def get_graph_token() -> str:
+    return await _get_cc_token("https://graph.microsoft.com/.default", _graph_token_cache)
+
+async def check_user_in_group(user_email: str) -> bool:
+    """Check if user belongs to 'Orgaos Sociais' group via MS Graph."""
+    try:
+        token = await get_graph_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient() as c:
+            r = await c.get(f"https://graph.microsoft.com/v1.0/users/{user_email}/memberOf?$select=displayName",
+                headers=headers, timeout=15)
+            if r.status_code != 200:
+                logger.error(f"Graph memberOf error for {user_email}: {r.status_code} {r.text[:200]}")
+                return False
+            groups = r.json().get("value", [])
+            for g in groups:
+                gname = g.get("displayName", "")
+                logger.info(f"  User group: {gname}")
+                if gname.strip().lower() == REQUIRED_GROUP_NAME.strip().lower():
+                    logger.info(f"  -> MATCH: user is in '{REQUIRED_GROUP_NAME}'")
+                    return True
+            logger.warning(f"User {user_email} not in group '{REQUIRED_GROUP_NAME}'. Groups: {[g.get('displayName') for g in groups]}")
+            return False
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Group check error: {e}")
+        return False
 
 async def dataverse_request(method: str, endpoint: str, json_data=None) -> dict:
     """Make authenticated request to Dataverse Web API."""
@@ -209,72 +242,74 @@ async def dataverse_request(method: str, endpoint: str, json_data=None) -> dict:
 # ── Auth ─────────────────────────────────────────────────────────────────
 @api_router.post("/auth/microsoft")
 async def microsoft_login(request: Request, response: Response, body: MicrosoftLoginRequest):
-    """Validate Microsoft token, restrict to allowed domain, create/find user, issue JWT."""
-    token = body.access_token
+    """Validate Microsoft token, check domain + group membership, create/find user."""
+    token = body.id_token
+    ms_access_token = body.access_token or ""
     email = ""
     name = ""
     tid = ""
 
-    # Try decoding as JWT (works for idToken, may fail for opaque accessToken)
-    try:
-        claims = pyjwt.decode(token, options={"verify_signature": False, "verify_aud": False, "verify_exp": False})
-        email = (claims.get("preferred_username") or claims.get("upn") or claims.get("email") or claims.get("unique_name") or "").lower().strip()
-        name = claims.get("name", "")
-        tid = claims.get("tid", "")
-        logger.info(f"Microsoft login - decoded token: email={email}, name={name}, tid={tid}")
-    except Exception as e:
-        logger.error(f"Microsoft login - failed to decode token: {e}")
-        # If it's an opaque access token, try calling MS Graph to get user info
+    # 1. Decode idToken to get user claims
+    if token:
         try:
-            async with httpx.AsyncClient() as client:
-                r = await client.get("https://graph.microsoft.com/v1.0/me",
-                    headers={"Authorization": f"Bearer {token}"}, timeout=10)
+            claims = pyjwt.decode(token, options={"verify_signature": False, "verify_aud": False, "verify_exp": False})
+            email = (claims.get("preferred_username") or claims.get("upn") or claims.get("email") or claims.get("unique_name") or "").lower().strip()
+            name = claims.get("name", "")
+            tid = claims.get("tid", "")
+            logger.info(f"Microsoft login - idToken decoded: email={email}, name={name}, tid={tid}")
+        except Exception as e:
+            logger.warning(f"Microsoft login - idToken decode failed: {e}")
+
+    # 2. Fallback: use accessToken with MS Graph /me
+    if not email and ms_access_token:
+        try:
+            async with httpx.AsyncClient() as c:
+                r = await c.get("https://graph.microsoft.com/v1.0/me", headers={"Authorization": f"Bearer {ms_access_token}"}, timeout=10)
                 if r.status_code == 200:
-                    profile = r.json()
-                    email = (profile.get("mail") or profile.get("userPrincipalName") or "").lower().strip()
-                    name = profile.get("displayName", "")
-                    logger.info(f"Microsoft login - MS Graph fallback: email={email}, name={name}")
-                else:
-                    logger.error(f"Microsoft login - MS Graph error: {r.status_code} {r.text[:200]}")
-                    raise HTTPException(status_code=401, detail="Nao foi possivel validar o token Microsoft")
-        except httpx.RequestError as e2:
-            logger.error(f"Microsoft login - MS Graph request error: {e2}")
-            raise HTTPException(status_code=401, detail="Erro ao validar token Microsoft")
+                    p = r.json()
+                    email = (p.get("mail") or p.get("userPrincipalName") or "").lower().strip()
+                    name = p.get("displayName", "") or name
+                    logger.info(f"Microsoft login - Graph /me: email={email}, name={name}")
+        except Exception as e:
+            logger.error(f"Microsoft login - Graph /me error: {e}")
 
     if not email:
-        raise HTTPException(status_code=401, detail="Email nao encontrado no token Microsoft")
+        raise HTTPException(status_code=401, detail="Nao foi possivel obter o email da conta Microsoft")
 
-    # Validate domain
+    # 3. Validate domain
     allowed_domain = "sociedadesaojoaodaslampas.pt"
     if not email.endswith(f"@{allowed_domain}"):
         logger.warning(f"Microsoft login - domain rejected: {email}")
         raise HTTPException(status_code=403, detail=f"Apenas contas @{allowed_domain} sao permitidas")
 
-    # Validate tenant if configured
+    # 4. Validate tenant
     if AZURE_TENANT_ID and tid and tid != AZURE_TENANT_ID:
         logger.warning(f"Microsoft login - tenant rejected: {tid}")
         raise HTTPException(status_code=403, detail="Tenant nao autorizado")
 
-    # Find or create user in MongoDB
+    # 5. Check group membership - user must be in "Orgaos Sociais"
+    logger.info(f"Microsoft login - checking group '{REQUIRED_GROUP_NAME}' for {email}")
+    in_group = await check_user_in_group(email)
+    if not in_group:
+        raise HTTPException(status_code=403, detail=f"O utilizador nao pertence ao grupo '{REQUIRED_GROUP_NAME}'. Contacte o administrador.")
+
+    # 6. Find or create user in MongoDB
     user = await db.users.find_one({"email": email})
     if not user:
-        logger.info(f"Microsoft login - creating new user: {email}")
+        logger.info(f"Microsoft login - creating user: {email}")
         try:
-            insert_result = await db.users.insert_one({
+            res = await db.users.insert_one({
                 "email": email, "name": name, "role": "admin", "provider": "microsoft",
                 "password_hash": "", "created_at": datetime.now(timezone.utc).isoformat(),
             })
-            user = await db.users.find_one({"_id": insert_result.inserted_id})
-            logger.info(f"Microsoft login - user created: {email} -> {insert_result.inserted_id}")
+            user = await db.users.find_one({"_id": res.inserted_id})
+            logger.info(f"Microsoft login - user created: {email}")
         except Exception as e:
             logger.error(f"Microsoft login - user creation failed: {e}")
-            # Try finding again (might have been created by concurrent request)
             user = await db.users.find_one({"email": email})
             if not user:
                 raise HTTPException(status_code=500, detail="Erro ao criar utilizador")
     else:
-        logger.info(f"Microsoft login - existing user: {email}")
-        # Update name if changed
         if name and user.get("name") != name:
             await db.users.update_one({"email": email}, {"$set": {"name": name, "provider": "microsoft"}})
 
@@ -283,7 +318,7 @@ async def microsoft_login(request: Request, response: Response, body: MicrosoftL
     rt = create_refresh_token(uid)
     response.set_cookie(key="access_token", value=at, httponly=True, secure=False, samesite="lax", max_age=3600, path="/")
     response.set_cookie(key="refresh_token", value=rt, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
-    logger.info(f"Microsoft login - success: {email}, uid={uid}")
+    logger.info(f"Microsoft login - SUCCESS: {email}")
     return {"id": uid, "email": email, "name": name or user.get("name", ""), "role": user.get("role", "admin"), "provider": "microsoft", "token": at}
 
 @api_router.post("/auth/login")

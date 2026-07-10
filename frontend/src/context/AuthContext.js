@@ -28,9 +28,12 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const loginWithMicrosoft = async (token) => {
-    console.log("Sending Microsoft token to backend, length:", token?.length);
-    const { data } = await axios.post(`${API}/auth/microsoft`, { access_token: token }, { withCredentials: true });
+  const loginWithMicrosoft = async (idToken, accessToken) => {
+    console.log("Sending Microsoft tokens to backend");
+    const { data } = await axios.post(`${API}/auth/microsoft`, {
+      id_token: idToken || "",
+      access_token: accessToken || "",
+    }, { withCredentials: true });
     console.log("Microsoft login response:", data);
     if (data && data.id) {
       setUser(data);
