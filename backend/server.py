@@ -210,40 +210,81 @@ async def dataverse_request(method: str, endpoint: str, json_data=None) -> dict:
 @api_router.post("/auth/microsoft")
 async def microsoft_login(request: Request, response: Response, body: MicrosoftLoginRequest):
     """Validate Microsoft token, restrict to allowed domain, create/find user, issue JWT."""
+    token = body.access_token
+    email = ""
+    name = ""
+    tid = ""
+
+    # Try decoding as JWT (works for idToken, may fail for opaque accessToken)
     try:
-        # Decode the Microsoft ID token (we trust Azure AD's signature for now)
-        claims = pyjwt.decode(body.access_token, options={"verify_signature": False, "verify_aud": False})
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid Microsoft token")
+        claims = pyjwt.decode(token, options={"verify_signature": False, "verify_aud": False, "verify_exp": False})
+        email = (claims.get("preferred_username") or claims.get("upn") or claims.get("email") or claims.get("unique_name") or "").lower().strip()
+        name = claims.get("name", "")
+        tid = claims.get("tid", "")
+        logger.info(f"Microsoft login - decoded token: email={email}, name={name}, tid={tid}")
+    except Exception as e:
+        logger.error(f"Microsoft login - failed to decode token: {e}")
+        # If it's an opaque access token, try calling MS Graph to get user info
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.get("https://graph.microsoft.com/v1.0/me",
+                    headers={"Authorization": f"Bearer {token}"}, timeout=10)
+                if r.status_code == 200:
+                    profile = r.json()
+                    email = (profile.get("mail") or profile.get("userPrincipalName") or "").lower().strip()
+                    name = profile.get("displayName", "")
+                    logger.info(f"Microsoft login - MS Graph fallback: email={email}, name={name}")
+                else:
+                    logger.error(f"Microsoft login - MS Graph error: {r.status_code} {r.text[:200]}")
+                    raise HTTPException(status_code=401, detail="Nao foi possivel validar o token Microsoft")
+        except httpx.RequestError as e2:
+            logger.error(f"Microsoft login - MS Graph request error: {e2}")
+            raise HTTPException(status_code=401, detail="Erro ao validar token Microsoft")
 
-    email = (claims.get("preferred_username") or claims.get("upn") or claims.get("email") or "").lower().strip()
-    name = claims.get("name", "")
-    tid = claims.get("tid", "")
-
-    # Validate tenant if configured
-    if AZURE_TENANT_ID and tid != AZURE_TENANT_ID:
-        raise HTTPException(status_code=403, detail="Tenant nao autorizado")
+    if not email:
+        raise HTTPException(status_code=401, detail="Email nao encontrado no token Microsoft")
 
     # Validate domain
     allowed_domain = "sociedadesaojoaodaslampas.pt"
     if not email.endswith(f"@{allowed_domain}"):
+        logger.warning(f"Microsoft login - domain rejected: {email}")
         raise HTTPException(status_code=403, detail=f"Apenas contas @{allowed_domain} sao permitidas")
+
+    # Validate tenant if configured
+    if AZURE_TENANT_ID and tid and tid != AZURE_TENANT_ID:
+        logger.warning(f"Microsoft login - tenant rejected: {tid}")
+        raise HTTPException(status_code=403, detail="Tenant nao autorizado")
 
     # Find or create user in MongoDB
     user = await db.users.find_one({"email": email})
     if not user:
-        insert_result = await db.users.insert_one({
-            "email": email, "name": name, "role": "admin", "provider": "microsoft",
-            "password_hash": "", "created_at": datetime.now(timezone.utc).isoformat(),
-        })
-        user = await db.users.find_one({"_id": insert_result.inserted_id})
+        logger.info(f"Microsoft login - creating new user: {email}")
+        try:
+            insert_result = await db.users.insert_one({
+                "email": email, "name": name, "role": "admin", "provider": "microsoft",
+                "password_hash": "", "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            user = await db.users.find_one({"_id": insert_result.inserted_id})
+            logger.info(f"Microsoft login - user created: {email} -> {insert_result.inserted_id}")
+        except Exception as e:
+            logger.error(f"Microsoft login - user creation failed: {e}")
+            # Try finding again (might have been created by concurrent request)
+            user = await db.users.find_one({"email": email})
+            if not user:
+                raise HTTPException(status_code=500, detail="Erro ao criar utilizador")
+    else:
+        logger.info(f"Microsoft login - existing user: {email}")
+        # Update name if changed
+        if name and user.get("name") != name:
+            await db.users.update_one({"email": email}, {"$set": {"name": name, "provider": "microsoft"}})
 
     uid = str(user["_id"])
     at = create_access_token(uid, email, provider="microsoft")
     rt = create_refresh_token(uid)
     response.set_cookie(key="access_token", value=at, httponly=True, secure=False, samesite="lax", max_age=3600, path="/")
     response.set_cookie(key="refresh_token", value=rt, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
-    return {"id": uid, "email": email, "name": name, "role": user.get("role", "admin"), "provider": "microsoft", "token": at}
+    logger.info(f"Microsoft login - success: {email}, uid={uid}")
+    return {"id": uid, "email": email, "name": name or user.get("name", ""), "role": user.get("role", "admin"), "provider": "microsoft", "token": at}
 
 @api_router.post("/auth/login")
 async def login(request: Request, response: Response, body: LoginRequest):
