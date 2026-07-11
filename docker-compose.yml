@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: srdfsjl-backend:local
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL:-http://localhost:8001}
+        REACT_APP_AZURE_TENANT_ID: ${REACT_APP_AZURE_TENANT_ID:-}
+        REACT_APP_AZURE_CLIENT_ID: ${REACT_APP_AZURE_CLIENT_ID:-}
+    image: srdfsjl-frontend:local
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

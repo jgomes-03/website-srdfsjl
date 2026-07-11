@@ -107,3 +107,8 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+# Local secret value files for KV push
+secrets.dev.env
+secrets.prod.env
+

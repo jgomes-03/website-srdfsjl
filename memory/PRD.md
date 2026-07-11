@@ -58,6 +58,20 @@ Aplicadas alterações do GitHub do utilizador + CMS completo:
 - Testes: 51/51 backend (9 novos SSO em `/app/backend/tests/test_microsoft_sso.py`), frontend 100%
 - **Pendente do utilizador (uma das opções)**: (a) Azure Portal → App → Token configuration → Add groups claim (Security groups) OU (b) API permissions → GroupMember.Read.All (Application) + admin consent
 
+## Iteração 9 - Fix SSO M365 Group + Infra Docker/CI (11/07/2026)
+- **SSO fix**: grupo "Órgãos Sociais" é Microsoft 365 (não Security); ao adicionar groups claim é preciso escolher **"All groups"** em vez do default (Security). Backend agora loga todas as claims + detecta overage (`_claim_names`) + mensagem de erro explícita para o admin
+- Frontend: já não faz logout automático em erro — mostra a razão do 403 e limpa MSAL cache
+- **Infra Cloud** (novo):
+  - `backend/config.py`: loader central com Azure Key Vault via `DefaultAzureCredential` + fallback env vars (transparente em dev)
+  - `backend/Dockerfile` (Python 3.11 slim, uvicorn 2 workers, non-root, healthcheck)
+  - `frontend/Dockerfile` (multi-stage Node → Nginx com build args para `REACT_APP_*`) + `nginx.conf` (gzip, SPA fallback, cache imutável)
+  - `docker-compose.yml` para testes locais idênticos a produção
+  - `.github/workflows/deploy-dev.yml` (branch `dev` → ACA dev) e `deploy-prod.yml` (branch `main` → ACA prod, com approval por Environment)
+  - CI usa **OIDC/Workload Identity Federation** (zero secrets long-lived no GitHub); imagens em **ghcr.io**
+  - `scripts/azure-bootstrap.sh`: cria RG, Key Vault (RBAC), User-Assigned MI com role *Key Vault Secrets User*, Log Analytics, ACA env + Container Apps (backend/frontend), federated credential GitHub OIDC — idempotente, por ambiente
+  - `scripts/kv-set-secrets.sh`: lê `secrets.dev.env` / `secrets.prod.env` (gitignored) e faz push para Key Vault (converte `_` → `-`)
+  - `INFRA.md`: passo-a-passo completo (bootstrap → KV → GitHub Environments → Cloudflare DNS → primeiro deploy)
+
 ## Backlog
 ### P1
 - Integração PowerApps para gestão de sócios

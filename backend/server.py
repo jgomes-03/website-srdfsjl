@@ -1,8 +1,6 @@
-from dotenv import load_dotenv
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response
 from starlette.middleware.cors import CORSMiddleware
@@ -19,11 +17,13 @@ from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+from config import get as cfg_get, require as cfg_require
 
-JWT_SECRET = os.environ.get('JWT_SECRET', secrets.token_hex(32))
+mongo_url = cfg_require('MONGO_URL')
+client = AsyncIOMotorClient(mongo_url)
+db = client[cfg_require('DB_NAME')]
+
+JWT_SECRET = cfg_get('JWT_SECRET') or secrets.token_hex(32)
 JWT_ALGORITHM = "HS256"
 
 app = FastAPI()
@@ -163,12 +163,12 @@ class MicrosoftLoginRequest(BaseModel):
     access_token: Optional[str] = ""
 
 # ── Azure AD / Dataverse Config ──────────────────────────────────────────
-AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID", "")
-AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID", "")
-AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "")
-DATAVERSE_URL = os.environ.get("DATAVERSE_URL", "")
-DATAVERSE_TABLE = os.environ.get("DATAVERSE_TABLE_NAME", "cr56f_sociosv2s")
-REQUIRED_GROUP_ID = os.environ.get("AZURE_REQUIRED_GROUP_ID", "442fb52b-5d77-4553-9f8e-3a99bf688403")
+AZURE_TENANT_ID = cfg_get("AZURE_TENANT_ID", "") or ""
+AZURE_CLIENT_ID = cfg_get("AZURE_CLIENT_ID", "") or ""
+AZURE_CLIENT_SECRET = cfg_get("AZURE_CLIENT_SECRET", "") or ""
+DATAVERSE_URL = cfg_get("DATAVERSE_URL", "") or ""
+DATAVERSE_TABLE = cfg_get("DATAVERSE_TABLE_NAME", "cr56f_sociosv2s") or "cr56f_sociosv2s"
+REQUIRED_GROUP_ID = cfg_get("AZURE_REQUIRED_GROUP_ID", "442fb52b-5d77-4553-9f8e-3a99bf688403") or "442fb52b-5d77-4553-9f8e-3a99bf688403"
 
 _dataverse_token_cache = {"token": None, "expires": None}
 _graph_token_cache = {"token": None, "expires": None}
@@ -750,7 +750,7 @@ app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=(cfg_get('CORS_ORIGINS', '*') or '*').split(','),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -764,8 +764,8 @@ async def startup():
     await db.members.create_index("email", unique=True)
 
     # Seed admin
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@srdfsjl.pt")
-    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    admin_email = cfg_get("ADMIN_EMAIL", "admin@srdfsjl.pt") or "admin@srdfsjl.pt"
+    admin_password = cfg_get("ADMIN_PASSWORD", "admin123") or "admin123"
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
         await db.users.insert_one({"email": admin_email, "password_hash": hash_password(admin_password), "name": "Administrador", "role": "admin", "created_at": datetime.now(timezone.utc).isoformat()})
