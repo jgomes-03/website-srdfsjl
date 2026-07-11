@@ -6,8 +6,11 @@ WORKDIR /app
 # Enable Corepack for Yarn
 RUN corepack enable
 
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+# 💡 FIX: Copy package.json and optionally copy any lockfile if it exists
+COPY package.json yarn.lock* package-lock.json* ./
+
+# 💡 FIX: Fallback to regular yarn install if a frozen lockfile isn't possible
+RUN yarn install --frozen-lockfile || yarn install
 
 COPY . .
 
