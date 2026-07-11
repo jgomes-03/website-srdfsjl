@@ -51,6 +51,13 @@ Aplicadas alterações do GitHub do utilizador + CMS completo:
 - Se validação falhar: `logoutRedirect` MSAL → homepage
 - Requer permissão Graph `GroupMember.Read.All` (Application) concedida no tenant
 
+## Iteração 8 - Fix SSO Logout Bug (10/07/2026)
+- **Causa raiz**: client secret Azure inválido (AADSTS7000215) → substituído por secret novo no backend/.env (Graph + Dataverse OK, 327 sócios)
+- Validação de grupo: verifica primeiro claim `groups` do idToken; fallback para Graph `memberOf` (requer `GroupMember.Read.All` Application — ainda pendente no Azure)
+- Frontend: logout MSAL só em 401/403; erros 5xx mostram mensagem sem logout
+- Testes: 51/51 backend (9 novos SSO em `/app/backend/tests/test_microsoft_sso.py`), frontend 100%
+- **Pendente do utilizador (uma das opções)**: (a) Azure Portal → App → Token configuration → Add groups claim (Security groups) OU (b) API permissions → GroupMember.Read.All (Application) + admin consent
+
 ## Backlog
 ### P1
 - Integração PowerApps para gestão de sócios
