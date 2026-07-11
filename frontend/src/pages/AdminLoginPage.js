@@ -35,18 +35,16 @@ export default function AdminLoginPage() {
             navigate("/admin");
           } catch (err) {
             const status = err?.response?.status;
-            console.error("Microsoft validation failed:", status, err?.response?.data?.detail || err.message);
-            if (status === 403 || status === 401) {
-              // Access denied (not in group / wrong domain) -> logout + homepage
-              await msalInstance.logoutRedirect({
-                account: result.account,
-                postLogoutRedirectUri: window.location.origin,
-              });
-            } else {
-              // Server/config error -> show message, don't logout
-              setValidating(false);
-              setError(err?.response?.data?.detail || "Erro no servidor ao validar o acesso. Tente novamente.");
-            }
+            const detail = err?.response?.data?.detail || err.message;
+            console.error("Microsoft validation failed:", status, detail);
+            // Always show the reason instead of silently logging out.
+            // The user can manually try again or use bypass login.
+            try {
+              // Clear MSAL cache so next attempt is a fresh auth
+              await msalInstance.clearCache();
+            } catch (_) { /* ignore */ }
+            setValidating(false);
+            setError(typeof detail === "string" ? detail : "Erro ao validar acesso Microsoft. Tente novamente.");
           }
         }
       } catch (err) {

@@ -249,6 +249,7 @@ async def microsoft_login(request: Request, response: Response, body: MicrosoftL
     name = ""
     tid = ""
     token_groups = []
+    has_overage = False
 
     # 1. Decode idToken to get user claims
     if token:
@@ -258,7 +259,17 @@ async def microsoft_login(request: Request, response: Response, body: MicrosoftL
             name = claims.get("name", "")
             tid = claims.get("tid", "")
             token_groups = [str(g).lower() for g in (claims.get("groups") or [])]
-            logger.info(f"Microsoft login - idToken decoded: email={email}, name={name}, tid={tid}, groups_in_token={len(token_groups)}")
+            # Detect group overage claim (>200 groups → Azure sends _claim_names with groups source)
+            claim_names = claims.get("_claim_names") or {}
+            if "groups" in claim_names:
+                has_overage = True
+            logger.info(
+                f"Microsoft login - idToken decoded: email={email}, name={name}, tid={tid}, "
+                f"groups_in_token={len(token_groups)}, hasgroups={claims.get('hasgroups')}, "
+                f"overage={has_overage}, all_claim_keys={sorted(claims.keys())}"
+            )
+            if token_groups:
+                logger.info(f"Microsoft login - groups in token: {token_groups}")
         except Exception as e:
             logger.warning(f"Microsoft login - idToken decode failed: {e}")
 
@@ -291,13 +302,30 @@ async def microsoft_login(request: Request, response: Response, body: MicrosoftL
 
     # 5. Check group membership by group object id (token claim first, Graph fallback)
     logger.info(f"Microsoft login - checking group {REQUIRED_GROUP_ID} for {email}")
+    in_group = False
     if REQUIRED_GROUP_ID.lower() in token_groups:
         logger.info("Microsoft login - group match via idToken 'groups' claim")
         in_group = True
     else:
-        in_group = await check_user_in_group(email)
+        # Fallback: try MS Graph (needs app permission GroupMember.Read.All + admin consent)
+        try:
+            in_group = await check_user_in_group(email)
+        except Exception as e:
+            logger.error(f"Microsoft login - Graph fallback failed: {e}")
+            in_group = False
     if not in_group:
-        raise HTTPException(status_code=403, detail="O utilizador nao pertence ao grupo autorizado. Contacte o administrador.")
+        # Build informative diagnostic for admin
+        if not token_groups and not has_overage:
+            detail = (
+                "O token nao contem a claim 'groups'. Verifique no Azure Portal: "
+                "App registrations -> Token configuration -> groups claim -> Edit -> "
+                "'Select group types' deve incluir 'All groups' (o grupo Orgaos Sociais e Microsoft 365, "
+                "nao Security). Depois faca logout e login novamente."
+            )
+        else:
+            detail = "O utilizador nao pertence ao grupo autorizado (Orgaos Sociais). Contacte o administrador."
+        logger.warning(f"Microsoft login - authorization denied for {email}. token_groups={token_groups}, overage={has_overage}")
+        raise HTTPException(status_code=403, detail=detail)
 
     # 6. Find or create user in MongoDB
     user = await db.users.find_one({"email": email})
