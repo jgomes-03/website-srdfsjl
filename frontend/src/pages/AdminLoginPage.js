@@ -34,12 +34,19 @@ export default function AdminLoginPage() {
             await loginWithMicrosoft(result.idToken, result.accessToken);
             navigate("/admin");
           } catch (err) {
-            // Validation failed (not in group / wrong domain) -> logout + homepage
-            console.error("Microsoft validation failed:", err?.response?.data?.detail || err.message);
-            await msalInstance.logoutRedirect({
-              account: result.account,
-              postLogoutRedirectUri: window.location.origin,
-            });
+            const status = err?.response?.status;
+            console.error("Microsoft validation failed:", status, err?.response?.data?.detail || err.message);
+            if (status === 403 || status === 401) {
+              // Access denied (not in group / wrong domain) -> logout + homepage
+              await msalInstance.logoutRedirect({
+                account: result.account,
+                postLogoutRedirectUri: window.location.origin,
+              });
+            } else {
+              // Server/config error -> show message, don't logout
+              setValidating(false);
+              setError(err?.response?.data?.detail || "Erro no servidor ao validar o acesso. Tente novamente.");
+            }
           }
         }
       } catch (err) {

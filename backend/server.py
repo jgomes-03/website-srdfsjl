@@ -248,6 +248,7 @@ async def microsoft_login(request: Request, response: Response, body: MicrosoftL
     email = ""
     name = ""
     tid = ""
+    token_groups = []
 
     # 1. Decode idToken to get user claims
     if token:
@@ -256,7 +257,8 @@ async def microsoft_login(request: Request, response: Response, body: MicrosoftL
             email = (claims.get("preferred_username") or claims.get("upn") or claims.get("email") or claims.get("unique_name") or "").lower().strip()
             name = claims.get("name", "")
             tid = claims.get("tid", "")
-            logger.info(f"Microsoft login - idToken decoded: email={email}, name={name}, tid={tid}")
+            token_groups = [str(g).lower() for g in (claims.get("groups") or [])]
+            logger.info(f"Microsoft login - idToken decoded: email={email}, name={name}, tid={tid}, groups_in_token={len(token_groups)}")
         except Exception as e:
             logger.warning(f"Microsoft login - idToken decode failed: {e}")
 
@@ -287,9 +289,13 @@ async def microsoft_login(request: Request, response: Response, body: MicrosoftL
         logger.warning(f"Microsoft login - tenant rejected: {tid}")
         raise HTTPException(status_code=403, detail="Tenant nao autorizado")
 
-    # 5. Check group membership by group object id
+    # 5. Check group membership by group object id (token claim first, Graph fallback)
     logger.info(f"Microsoft login - checking group {REQUIRED_GROUP_ID} for {email}")
-    in_group = await check_user_in_group(email)
+    if REQUIRED_GROUP_ID.lower() in token_groups:
+        logger.info("Microsoft login - group match via idToken 'groups' claim")
+        in_group = True
+    else:
+        in_group = await check_user_in_group(email)
     if not in_group:
         raise HTTPException(status_code=403, detail="O utilizador nao pertence ao grupo autorizado. Contacte o administrador.")
 
