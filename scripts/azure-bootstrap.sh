@@ -35,8 +35,8 @@ fi
 SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-$(az account show --query id -o tsv)}"
 LOCATION="${LOCATION:-westeurope}"
 PROJECT="srdfsjl"
-GITHUB_ORG="${GITHUB_ORG:-YOUR-GITHUB-USER-OR-ORG}"      # <-- change
-GITHUB_REPO="${GITHUB_REPO:-YOUR-REPO-NAME}"             # <-- change
+GITHUB_ORG="${GITHUB_ORG:jgomes-03}"      # <-- change
+GITHUB_REPO="${GITHUB_REPO:website-srdfsjl}"             # <-- change
 
 # ── Derived names ───────────────────────────────────────────────────────
 RG="rg-${PROJECT}-${ENV_NAME}"
