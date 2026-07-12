@@ -6,31 +6,29 @@ WORKDIR /app
 # Enable Corepack for Yarn
 RUN corepack enable
 
-# 💡 FIX: Copy package.json and optionally copy any lockfile if it exists
+# Copy lockfiles and run install
 COPY package.json yarn.lock* package-lock.json* ./
-
-# 💡 FIX: Fallback to regular yarn install if a frozen lockfile isn't possible
 RUN yarn install --frozen-lockfile || yarn install
 
-COPY . .
-
-# Public env vars are baked in at build time (React limitation).
-# Pass via --build-arg from CI.
+# ── 💡 FIX: Moved ARGs before copying code to break Docker cache ──
 ARG REACT_APP_BACKEND_URL
 ARG REACT_APP_AZURE_TENANT_ID
 ARG REACT_APP_AZURE_CLIENT_ID
+
 ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL \
     REACT_APP_AZURE_TENANT_ID=$REACT_APP_AZURE_TENANT_ID \
     REACT_APP_AZURE_CLIENT_ID=$REACT_APP_AZURE_CLIENT_ID \
     GENERATE_SOURCEMAP=false \
     CI=false
 
+# Copy remaining source files and compile
+COPY . .
 RUN yarn build
 
 # ── Stage 2: Serve via Nginx ────────────────────────────────────────────
 FROM nginx:1.27-alpine AS runtime
 
-# SPA fallback + gzip
+# SPA fallback + gzip config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 COPY --from=builder /app/build /usr/share/nginx/html
